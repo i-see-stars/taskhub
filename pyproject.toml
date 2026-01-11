@@ -9,3 +9,8 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi[standard]>=0.128.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]
