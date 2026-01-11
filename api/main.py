@@ -9,7 +9,7 @@ app.include_router(projects_router)
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to TaskHub project"}
+    return {"message": f"Welcome to {settings.PROJECT_NAME}"}
 
 
 @app.get("/health")
