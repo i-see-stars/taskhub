@@ -1,16 +1,14 @@
 from datetime import datetime
 
+from sqlalchemy import DateTime, func
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy import func, DateTime
-from sqlalchemy.orm import sessionmaker, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from api.core.config import settings
 
 engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
 
-async_session = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
+async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
