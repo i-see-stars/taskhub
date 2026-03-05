@@ -7,7 +7,10 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.17.2",
     "asyncpg>=0.31.0",
+    "bcrypt>=4.2.1",
     "fastapi[standard]>=0.128.0",
+    "greenlet>=3.1.2",
+    "pyjwt>=2.10.1",
 ]
 
 [dependency-groups]

@@ -10,6 +10,7 @@ from alembic import context
 from api.core.config import settings
 from api.core.database import Base
 from api.projects.models import Project  # noqa: F401
+from api.auth.models import User, RefreshToken  # noqa: F401
 
 
 # this is the Alembic Config object, which provides
