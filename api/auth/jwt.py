@@ -34,7 +34,7 @@ def create_jwt_token(user_id: str) -> JWTToken:
 
     access_token = jwt.encode(
         token_payload.model_dump(),
-        key=settings.jwt_secret_key.get_secret_value(),
+        key=settings.get_jwt_secret(),
         algorithm=settings.jwt_algorithm,
     )
 
@@ -45,7 +45,7 @@ def verify_jwt_token(token: str) -> JWTTokenPayload:
     try:
         raw_payload = jwt.decode(
             token,
-            settings.jwt_secret_key.get_secret_value(),
+            settings.get_jwt_secret(),
             algorithms=[settings.jwt_algorithm],
             options={"verify_signature": True},
             issuer=settings.jwt_issuer,
@@ -54,6 +54,6 @@ def verify_jwt_token(token: str) -> JWTTokenPayload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token invalid: {e}",
-        )
+        ) from e
 
     return JWTTokenPayload(**raw_payload)
