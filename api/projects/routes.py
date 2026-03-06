@@ -9,15 +9,11 @@ from api.projects.schemas import ProjectCreate, ProjectResponse
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-@router.post(
-    "", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     payload: ProjectCreate, session: AsyncSession = Depends(get_session)
 ):
-    exists = await session.scalar(
-        select(Project).where(Project.name == payload.name)
-    )
+    exists = await session.scalar(select(Project).where(Project.name == payload.name))
     if exists:
         raise HTTPException(
             status_code=409, detail="Project with this name already exists"
