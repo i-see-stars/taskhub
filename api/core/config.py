@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
     PROJECT_NAME: str = "TaskHub"
     DATABASE_URL: str
     DEBUG: bool = False

@@ -20,8 +20,8 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
 )
 
-# Security middleware
-if not settings.DEBUG and settings.ALLOWED_HOSTS != ["*"]:
+# Security middleware - only in production
+if not settings.DEBUG and settings.ALLOWED_HOSTS and settings.ALLOWED_HOSTS != ["*"]:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
 # CORS middleware
