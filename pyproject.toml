@@ -48,7 +48,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api"]
+known-first-party = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -59,7 +59,7 @@ asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=api",
+    "--cov=app",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -77,7 +77,7 @@ module = "alembic.*"
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["api"]
+source = ["app"]
 omit = ["*/tests/*", "*/alembic/*"]
 
 [tool.coverage.report]

@@ -5,7 +5,7 @@ import sys
 from datetime import UTC
 from typing import Any
 
-from api.core.config import settings
+from app.api.core.config import settings
 
 
 class JSONFormatter(logging.Formatter):

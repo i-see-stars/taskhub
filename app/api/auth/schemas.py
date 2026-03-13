@@ -15,7 +15,7 @@ class UserCreateRequest(BaseModel):
 
 
 class AccessTokenResponse(BaseModel):
-    token_type: str = "Bearer"
+    token_type: str = "bearer"
     access_token: str
     expires_at: int
     refresh_token: str

@@ -1,0 +1,82 @@
+### Register new user
+POST http://localhost:8000/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "securepassword123"
+}
+
+> {%
+    client.test("Register successful", function() {
+        client.assert(response.status === 201, "Response status is not 201");
+        client.global.set("user_id", response.body.user_id);
+        client.global.set("user_email", response.body.email);
+    });
+%}
+
+###
+
+### Login (get access token)
+POST http://localhost:8000/auth/access-token
+Content-Type: application/x-www-form-urlencoded
+
+username=user@example.com&password=securepassword123
+
+> {%
+    client.test("Login successful", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("access_token", response.body.access_token);
+        client.global.set("refresh_token", response.body.refresh_token);
+    });
+%}
+
+###
+
+### Get current user
+GET http://localhost:8000/auth/me
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Get current user", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.email === "user@example.com", "Email mismatch");
+    });
+%}
+
+###
+
+### Refresh access token
+POST http://localhost:8000/auth/refresh-token
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refresh_token}}"
+}
+
+> {%
+    client.test("Refresh token", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("access_token", response.body.access_token);
+    });
+%}
+
+###
+
+### Reset password
+POST http://localhost:8000/auth/reset-password
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "current_password": "securepassword123",
+  "new_password": "newsecurepassword456"
+}
+
+###
+
+### Delete current user
+DELETE http://localhost:8000/auth/me
+Authorization: Bearer {{access_token}}
+
+###

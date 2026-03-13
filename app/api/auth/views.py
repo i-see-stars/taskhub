@@ -7,23 +7,23 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.auth import api_messages, dependencies
-from api.auth.jwt import create_jwt_token
-from api.auth.models import RefreshToken, User
-from api.auth.password import (
+from app.api.auth import api_messages, dependencies
+from app.api.auth.jwt import create_jwt_token
+from app.api.auth.models import RefreshToken, User
+from app.api.auth.password import (
     DUMMY_PASSWORD,
     get_password_hash,
     verify_password,
 )
-from api.auth.schemas import (
+from app.api.auth.schemas import (
     AccessTokenResponse,
     RefreshTokenRequest,
     UserCreateRequest,
     UserResponse,
     UserUpdatePasswordRequest,
 )
-from api.core.config import settings
-from api.core.database import get_session
+from app.api.core.config import settings
+from app.api.core.database import get_session
 
 router = APIRouter(responses=api_messages.UNAUTHORIZED_RESPONSES)
 
@@ -80,13 +80,13 @@ async def login_access_token(
         verify_password(form_data.password, DUMMY_PASSWORD)
 
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=api_messages.PASSWORD_INVALID,
         )
 
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=api_messages.PASSWORD_INVALID,
         )
 
@@ -126,7 +126,7 @@ async def refresh_token(
 
     if token is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=api_messages.REFRESH_TOKEN_NOT_FOUND,
         )
     elif time.time() > token.exp:
@@ -186,12 +186,12 @@ async def register_new_user(
 
     try:
         await session.commit()
-    except IntegrityError:  # pragma: no cover
+    except IntegrityError as err:  # pragma: no cover
         await session.rollback()
 
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=api_messages.EMAIL_ADDRESS_ALREADY_USED,
-        )
+        ) from err
 
     return user

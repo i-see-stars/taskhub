@@ -4,10 +4,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from api.auth.views import router as auth_router
-from api.core.config import settings
-from api.core.logging import setup_logging
-from api.projects.routes import router as projects_router
+from app.api.auth.views import router as auth_router
+from app.api.core.config import settings
+from app.api.core.logging import setup_logging
+from app.api.issues.routes import router as issues_router
+from app.api.projects.routes import router as projects_router
 
 # Setup logging
 setup_logging()
@@ -34,8 +35,10 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+# Include routers
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(projects_router)
+app.include_router(issues_router)
 
 
 @app.get("/")
@@ -48,7 +51,7 @@ async def health():
     """Health check endpoint with database connectivity verification."""
     from sqlalchemy import text
 
-    from api.core.database import engine
+    from app.api.core.database import engine
 
     try:
         async with engine.connect() as conn:

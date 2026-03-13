@@ -1,0 +1,227 @@
+### Create a new epic
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "User Authentication System",
+  "description": "Implement complete user authentication system",
+  "type": "epic",
+  "status": "todo",
+  "priority": "high",
+  "project_id": "{{project_id}}"
+}
+
+> {%
+    client.test("Create epic", function() {
+        client.assert(response.status === 201, "Response status is not 201");
+        client.global.set("epic_id", response.body.issue_id);
+    });
+%}
+
+###
+
+### Create a story under epic
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "User registration flow",
+  "description": "Users should be able to register with email and password",
+  "type": "story",
+  "status": "in_progress",
+  "priority": "high",
+  "project_id": "{{project_id}}",
+  "parent_id": "{{epic_id}}"
+}
+
+> {%
+    client.test("Create story", function() {
+        client.assert(response.status === 201, "Response status is not 201");
+        client.global.set("story_id", response.body.issue_id);
+    });
+%}
+
+###
+
+### Create a task
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "Create registration endpoint",
+  "description": "POST /auth/register endpoint implementation",
+  "type": "task",
+  "status": "todo",
+  "priority": "medium",
+  "project_id": "{{project_id}}",
+  "parent_id": "{{story_id}}"
+}
+
+> {%
+    client.test("Create task", function() {
+        client.assert(response.status === 201, "Response status is not 201");
+        client.global.set("task_id", response.body.issue_id);
+    });
+%}
+
+###
+
+### Create a bug
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "Login fails with special characters in password",
+  "description": "When password contains special characters like @ or #, login fails",
+  "type": "bug",
+  "status": "todo",
+  "priority": "highest",
+  "project_id": "{{project_id}}"
+}
+
+> {%
+    client.test("Create bug", function() {
+        client.assert(response.status === 201, "Response status is not 201");
+        client.global.set("bug_id", response.body.issue_id);
+    });
+%}
+
+###
+
+### Get all issues
+GET http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("List all issues", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.total >= 0, "Total should be a number");
+    });
+%}
+
+###
+
+### Get issues filtered by project
+GET http://localhost:8000/issues?project_id={{project_id}}
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("List project issues", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###
+
+### Get specific issue
+GET http://localhost:8000/issues/{{task_id}}
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Get issue", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.issue_id === client.global.get("task_id"), "Issue ID mismatch");
+    });
+%}
+
+###
+
+### Update issue status
+PATCH http://localhost:8000/issues/{{task_id}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "status": "in_progress",
+  "priority": "high"
+}
+
+> {%
+    client.test("Update issue", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.status === "in_progress", "Status not updated");
+    });
+%}
+
+###
+
+### Assign issue to yourself
+PATCH http://localhost:8000/issues/{{task_id}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "assignee_id": "{{user_id}}"
+}
+
+###
+
+### Update issue to done
+PATCH http://localhost:8000/issues/{{task_id}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "status": "done"
+}
+
+###
+
+### Delete issue
+DELETE http://localhost:8000/issues/{{bug_id}}
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Delete issue", function() {
+        client.assert(response.status === 204, "Response status is not 204");
+    });
+%}
+
+###
+
+### Create multiple tasks for testing
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "Write unit tests",
+  "type": "task",
+  "status": "todo",
+  "priority": "medium",
+  "project_id": "{{project_id}}"
+}
+
+###
+
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "Update documentation",
+  "type": "task",
+  "status": "todo",
+  "priority": "low",
+  "project_id": "{{project_id}}"
+}
+
+###
+
+POST http://localhost:8000/issues
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "title": "Code review",
+  "type": "task",
+  "status": "in_review",
+  "priority": "medium",
+  "project_id": "{{project_id}}"
+}
+
+###

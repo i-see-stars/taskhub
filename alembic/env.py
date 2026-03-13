@@ -6,12 +6,11 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-
-from api.core.config import settings
-from api.core.database import Base
-from api.projects.models import Project  # noqa: F401
-from api.auth.models import User, RefreshToken  # noqa: F401
-
+from app.api.auth.models import RefreshToken, User  # noqa: F401
+from app.api.core.config import settings
+from app.api.core.database import Base
+from app.api.issues.models import Issue  # noqa: F401
+from app.api.projects.models import Project  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

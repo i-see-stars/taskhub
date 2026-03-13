@@ -1,0 +1,103 @@
+### Create a new project
+POST http://localhost:8000/projects
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "TaskHub Development",
+  "description": "Main project for TaskHub development",
+  "key": "THD"
+}
+
+> {%
+    client.test("Create project", function() {
+        client.assert(response.status === 201, "Response status is not 201");
+        client.global.set("project_id", response.body.project_id);
+        client.global.set("project_key", response.body.key);
+    });
+%}
+
+###
+
+### Get all projects
+GET http://localhost:8000/projects
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("List projects", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.total >= 0, "Total should be a number");
+    });
+%}
+
+###
+
+### Get specific project
+GET http://localhost:8000/projects/{{project_id}}
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Get project", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.project_id === client.global.get("project_id"), "Project ID mismatch");
+    });
+%}
+
+###
+
+### Update project
+PATCH http://localhost:8000/projects/{{project_id}}
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "TaskHub Development (Updated)",
+  "description": "Updated description for TaskHub project"
+}
+
+> {%
+    client.test("Update project", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.name === "TaskHub Development (Updated)", "Name not updated");
+    });
+%}
+
+###
+
+### Delete project (⚠️ This will delete the project and all its issues!)
+DELETE http://localhost:8000/projects/{{project_id}}
+Authorization: Bearer {{access_token}}
+
+> {%
+    client.test("Delete project", function() {
+        client.assert(response.status === 204, "Response status is not 204");
+    });
+%}
+
+###
+
+### Create another project for testing
+POST http://localhost:8000/projects
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "Mobile App",
+  "description": "Mobile application development",
+  "key": "MOBILE"
+}
+
+###
+
+### Create a third project
+POST http://localhost:8000/projects
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "name": "Backend API",
+  "description": "Backend API services",
+  "key": "API"
+}
+
+###

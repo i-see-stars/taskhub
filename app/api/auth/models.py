@@ -4,7 +4,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from api.core.database import Base
+from app.api.core.database import Base
 
 
 class User(Base):
