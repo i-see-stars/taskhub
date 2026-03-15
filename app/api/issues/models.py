@@ -1,7 +1,6 @@
 """Issue database models."""
 
 import uuid
-from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -80,15 +79,6 @@ class Issue(Base):
         sa.ForeignKey("auth_user.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
     )
 
     # Relationships

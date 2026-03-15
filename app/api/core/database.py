@@ -12,11 +12,14 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 
 
 class Base(DeclarativeBase):
-    create_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    update_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 

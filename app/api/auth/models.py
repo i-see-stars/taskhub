@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,15 +16,6 @@ class User(Base):
         sa.String(256), nullable=False, unique=True, index=True
     )
     hashed_password: Mapped[str] = mapped_column(sa.String(128), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
-    )
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")  # noqa: UP037
 

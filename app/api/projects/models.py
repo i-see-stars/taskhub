@@ -1,7 +1,6 @@
 """Project database models."""
 
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -28,15 +27,6 @@ class Project(Base):
     )
     owner_id: Mapped[str] = mapped_column(
         sa.ForeignKey("auth_user.user_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
         nullable=False,
     )
 
