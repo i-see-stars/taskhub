@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import api_messages, dependencies
+from app.api.auth import api_messages, deps
 from app.api.auth.jwt import create_jwt_token
 from app.api.auth.models import RefreshToken, User
 from app.api.auth.password import (
@@ -30,7 +30,7 @@ router = APIRouter(responses=api_messages.UNAUTHORIZED_RESPONSES)
 
 @router.get("/me", response_model=UserResponse, description="Get current user")
 async def read_current_user(
-    current_user: User = Depends(dependencies.get_current_user),
+    current_user: User = Depends(deps.get_current_user),
 ) -> User:
     return current_user
 
@@ -41,7 +41,7 @@ async def read_current_user(
     description="Delete current user",
 )
 async def delete_current_user(
-    current_user: User = Depends(dependencies.get_current_user),
+    current_user: User = Depends(deps.get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     await session.execute(delete(User).where(User.user_id == current_user.user_id))
@@ -56,7 +56,7 @@ async def delete_current_user(
 async def reset_current_user_password(
     user_update_password: UserUpdatePasswordRequest,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(dependencies.get_current_user),
+    current_user: User = Depends(deps.get_current_user),
 ) -> None:
     current_user.hashed_password = get_password_hash(user_update_password.password)
     session.add(current_user)
