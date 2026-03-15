@@ -42,12 +42,12 @@ app.include_router(issues_router)
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     return {"message": f"Welcome to {settings.PROJECT_NAME}"}
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     """Health check endpoint with database connectivity verification."""
     from sqlalchemy import text
 
