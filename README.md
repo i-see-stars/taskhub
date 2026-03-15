@@ -13,3 +13,11 @@ docker build -t taskhub .
 ```bash
 docker run --rm -p 8000:80 taskhub
 ```
+
+## Notes
+
+Запуск сервисов (db):
+
+```bash
+docker compose up -d
+```
