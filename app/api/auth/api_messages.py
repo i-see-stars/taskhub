@@ -1,3 +1,5 @@
+"""Auth API error messages and responses."""
+
 from typing import Any
 
 JWT_ERROR_USER_REMOVED = "User removed"

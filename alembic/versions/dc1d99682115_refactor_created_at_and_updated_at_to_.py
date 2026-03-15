@@ -1,4 +1,4 @@
-"""Refactor created_at and updated_at to Base and remove legacy time columns
+"""Refactor created_at and updated_at to Base and remove legacy time columns.
 
 Revision ID: dc1d99682115
 Revises: b47ab726b3c1

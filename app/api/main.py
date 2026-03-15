@@ -1,3 +1,5 @@
+"""Main FastAPI application."""
+
 import logging
 
 from fastapi import FastAPI
@@ -43,6 +45,7 @@ app.include_router(issues_router)
 
 @app.get("/")
 async def root() -> dict[str, str]:
+    """Root endpoint with welcome message."""
     return {"message": f"Welcome to {settings.PROJECT_NAME}"}
 
 

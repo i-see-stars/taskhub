@@ -1,3 +1,5 @@
+"""JWT token management."""
+
 import time
 
 import jwt
@@ -10,6 +12,8 @@ from app.api.core.config import settings
 # Payload follows RFC 7519
 # https://www.rfc-editor.org/rfc/rfc7519#section-4.1
 class JWTTokenPayload(BaseModel):
+    """JWT token payload schema."""
+
     iss: str
     sub: str
     exp: int
@@ -17,11 +21,21 @@ class JWTTokenPayload(BaseModel):
 
 
 class JWTToken(BaseModel):
+    """JWT token and its payload."""
+
     payload: JWTTokenPayload
     access_token: str
 
 
 def create_jwt_token(user_id: str) -> JWTToken:
+    """Create a new JWT access token.
+
+    Args:
+        user_id: The ID of the user to create the token for.
+
+    Returns:
+        A JWTToken containing the access token and its payload.
+    """
     iat = int(time.time())
     exp = iat + settings.jwt_access_token_expire_secs
 
@@ -42,6 +56,17 @@ def create_jwt_token(user_id: str) -> JWTToken:
 
 
 def verify_jwt_token(token: str) -> JWTTokenPayload:
+    """Verify a JWT access token.
+
+    Args:
+        token: The JWT access token to verify.
+
+    Returns:
+        The decoded JWTTokenPayload.
+
+    Raises:
+        HTTPException: If the token is invalid or expired.
+    """
     try:
         raw_payload = jwt.decode(
             token,

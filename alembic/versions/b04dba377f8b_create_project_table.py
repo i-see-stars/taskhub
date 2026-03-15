@@ -1,4 +1,4 @@
-"""create project table
+"""create project table.
 
 Revision ID: b04dba377f8b
 Revises:
