@@ -24,7 +24,7 @@ async def list_issues(
     project_id: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> IssueListResponse:
     """List all issues for current user (optionally filtered by project)."""
     query = select(Issue).join(Project).where(Project.owner_id == current_user.user_id)
 
@@ -41,7 +41,7 @@ async def create_issue(
     issue_data: IssueCreate,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> Issue:
     """Create a new issue."""
     # Verify project exists and user owns it
     project_result = await session.execute(
@@ -86,7 +86,7 @@ async def get_issue(
     issue_id: str,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> Issue:
     """Get issue by ID."""
     result = await session.execute(
         select(Issue)
@@ -111,7 +111,7 @@ async def update_issue(
     issue_data: IssueUpdate,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> Issue:
     """Update issue."""
     result = await session.execute(
         select(Issue)
@@ -142,7 +142,7 @@ async def delete_issue(
     issue_id: str,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> None:
     """Delete issue."""
     result = await session.execute(
         select(Issue)

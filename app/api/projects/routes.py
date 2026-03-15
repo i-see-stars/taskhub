@@ -22,7 +22,7 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 async def list_projects(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> ProjectListResponse:
     """List all projects for current user."""
     result = await session.execute(
         select(Project).where(Project.owner_id == current_user.user_id)
@@ -36,7 +36,7 @@ async def create_project(
     project_data: ProjectCreate,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> Project:
     """Create a new project."""
     # Check if project key already exists
     existing = await session.execute(
@@ -63,7 +63,7 @@ async def get_project(
     project_id: str,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> Project:
     """Get project by ID."""
     result = await session.execute(
         select(Project).where(
@@ -86,7 +86,7 @@ async def update_project(
     project_data: ProjectUpdate,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> Project:
     """Update project."""
     result = await session.execute(
         select(Project).where(
@@ -115,7 +115,7 @@ async def delete_project(
     project_id: str,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
-):
+) -> None:
     """Delete project."""
     result = await session.execute(
         select(Project).where(
