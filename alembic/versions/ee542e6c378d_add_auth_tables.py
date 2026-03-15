@@ -1,4 +1,4 @@
-"""Add auth tables
+"""Add auth tables.
 
 Revision ID: ee542e6c378d
 Revises: b04dba377f8b

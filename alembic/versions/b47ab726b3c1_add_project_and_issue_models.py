@@ -1,4 +1,4 @@
-"""Add Project and Issue models
+"""Add Project and Issue models.
 
 Revision ID: b47ab726b3c1
 Revises: ee542e6c378d

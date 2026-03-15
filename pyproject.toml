@@ -42,6 +42,7 @@ select = [
     "UP",  # pyupgrade
     "ARG", # flake8-unused-arguments
     "SIM", # flake8-simplify
+    "D",   # pydocstyle
 ]
 ignore = [
     "E501",  # line too long, handled by formatter
@@ -50,6 +51,9 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

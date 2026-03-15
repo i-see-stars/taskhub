@@ -1,3 +1,5 @@
+"""Auth API routes."""
+
 import secrets
 import time
 
@@ -32,6 +34,7 @@ router = APIRouter(responses=api_messages.UNAUTHORIZED_RESPONSES)
 async def read_current_user(
     current_user: User = Depends(deps.get_current_user),
 ) -> User:
+    """Get the currently authenticated user."""
     return current_user
 
 
@@ -44,6 +47,7 @@ async def delete_current_user(
     current_user: User = Depends(deps.get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> None:
+    """Delete the current user's account."""
     await session.execute(delete(User).where(User.user_id == current_user.user_id))
     await session.commit()
 
@@ -58,6 +62,7 @@ async def reset_current_user_password(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(deps.get_current_user),
 ) -> None:
+    """Update the current user's password."""
     current_user.hashed_password = get_password_hash(user_update_password.password)
     session.add(current_user)
     await session.commit()
@@ -73,6 +78,7 @@ async def login_access_token(
     session: AsyncSession = Depends(get_session),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> AccessTokenResponse:
+    """Login with email and password to get an access token."""
     user = await session.scalar(select(User).where(User.email == form_data.username))
 
     if user is None:
@@ -118,6 +124,7 @@ async def refresh_token(
     data: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
 ) -> AccessTokenResponse:
+    """Refresh an access token using a refresh token."""
     token = await session.scalar(
         select(RefreshToken)
         .where(RefreshToken.refresh_token == data.refresh_token)
@@ -171,6 +178,7 @@ async def register_new_user(
     new_user: UserCreateRequest,
     session: AsyncSession = Depends(get_session),
 ) -> User:
+    """Register a new user account."""
     user = await session.scalar(select(User).where(User.email == new_user.email))
     if user is not None:
         raise HTTPException(

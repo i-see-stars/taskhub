@@ -1,3 +1,5 @@
+"""Alembic environment configuration."""
+
 import asyncio
 from logging.config import fileConfig
 
@@ -63,6 +65,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """Run migrations in 'online' mode with a connection."""
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -74,11 +77,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    """In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-
+    """Run migrations in 'online' mode using an async engine."""
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -93,7 +92,6 @@ async def run_async_migrations() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-
     asyncio.run(run_async_migrations())
 
 

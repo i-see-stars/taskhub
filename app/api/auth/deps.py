@@ -1,3 +1,5 @@
+"""Auth dependencies."""
+
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -17,6 +19,18 @@ async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     session: AsyncSession = Depends(get_session),
 ) -> User:
+    """Get the current authenticated user from the JWT token.
+
+    Args:
+        token: The OAuth2 bearer token.
+        session: Database session.
+
+    Returns:
+        The authenticated User model.
+
+    Raises:
+        HTTPException: If the user is not found or token is invalid.
+    """
     token_payload = verify_jwt_token(token)
 
     user = await session.scalar(select(User).where(User.user_id == token_payload.sub))
