@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-from app.api.auth.views import router as auth_router
+from app.api.auth.routes import router as auth_router
 from app.api.core.config import settings
 from app.api.core.logging import setup_logging
 from app.api.issues.routes import router as issues_router
