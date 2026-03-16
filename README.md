@@ -1,7 +1,7 @@
 # 🚀 TaskHub
 
-[![CI](https://github.com/alex/taskhub/actions/workflows/ci.yml/badge.svg)](https://github.com/alex/taskhub/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](https://github.com/alex/taskhub/actions)
+[![CI](https://github.com/i-see-stars/taskhub/actions/workflows/ci.yml/badge.svg)](https://github.com/i-see-stars/taskhub/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](https://github.com/i-see-stars/taskhub/actions)
 [![Python](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/release/python-3140/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-336791.svg?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -47,7 +47,7 @@ The project uses `uv` for package management and a `Makefile` to automate routin
 ### 1. Environment Setup
 ```bash
 # Clone the repository
-git clone https://github.com/alex/taskhub.git
+git clone https://github.com/i-see-stars/taskhub.git
 cd taskhub
 
 # Install dependencies (including dev tools)
