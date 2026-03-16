@@ -27,7 +27,7 @@ format:  ## Format code with ruff
 	uv run ruff format .
 
 type-check:  ## Run mypy type checking
-	uv run mypy app/
+	uv run mypy app/ tests/
 
 pre-commit:  ## Run pre-commit on all files
 	uv run pre-commit run --all-files
@@ -52,7 +52,7 @@ docker-logs:  ## Show Docker Compose logs
 
 check:  ## Run all checks (lint, type-check, test)
 	uv run ruff check .
-	uv run mypy app/
+	uv run mypy app/ tests/
 	uv run pytest
 
 migrate:  ## Run database migrations
