@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator
 import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 # Override settings BEFORE importing app
@@ -34,7 +34,7 @@ from app.api.projects.models import Project
 
 
 @pytest.fixture(scope="session")
-async def engine():
+async def engine() -> AsyncGenerator[AsyncEngine]:
     """Create a test database engine for the session."""
     test_engine = create_async_engine(
         TEST_DATABASE_URL,
@@ -53,7 +53,7 @@ async def engine():
 
 
 @pytest.fixture
-async def db_session(engine) -> AsyncGenerator[AsyncSession]:
+async def db_session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
     """Create a clean database session for each test."""
     connection = await engine.connect()
     transaction = await connection.begin()
@@ -71,7 +71,7 @@ async def db_session(engine) -> AsyncGenerator[AsyncSession]:
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
     """Create a test client with database session override."""
 
-    async def override_get_session():
+    async def override_get_session() -> AsyncGenerator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = override_get_session

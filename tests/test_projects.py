@@ -5,10 +5,13 @@ from fastapi import status
 from httpx import AsyncClient
 
 from app.api.projects.models import Project
+from app.api.projects.schemas import ProjectListResponse, ProjectResponse
 
 
 @pytest.mark.asyncio
-async def test_create_project(client: AsyncClient, auth_headers: dict):
+async def test_create_project(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
     """Test creating a new project."""
     response = await client.post(
         "/projects",
@@ -20,16 +23,16 @@ async def test_create_project(client: AsyncClient, auth_headers: dict):
         },
     )
     assert response.status_code == status.HTTP_201_CREATED
-    data = response.json()
-    assert data["name"] == "My Project"
-    assert data["key"] == "MYPROJ"
-    assert "project_id" in data
+    data = ProjectResponse.model_validate(response.json())
+    assert data.name == "My Project"
+    assert data.key == "MYPROJ"
+    assert data.project_id is not None
 
 
 @pytest.mark.asyncio
 async def test_create_project_duplicate_key(
-    client: AsyncClient, auth_headers: dict, test_project: Project
-):
+    client: AsyncClient, auth_headers: dict[str, str], test_project: Project
+) -> None:
     """Test creating project with duplicate key."""
     response = await client.post(
         "/projects",
@@ -44,7 +47,7 @@ async def test_create_project_duplicate_key(
 
 
 @pytest.mark.asyncio
-async def test_create_project_unauthorized(client: AsyncClient):
+async def test_create_project_unauthorized(client: AsyncClient) -> None:
     """Test creating project without authentication."""
     response = await client.post(
         "/projects",
@@ -55,20 +58,18 @@ async def test_create_project_unauthorized(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_list_projects(
-    client: AsyncClient, auth_headers: dict, test_project: Project
-):
+    client: AsyncClient, auth_headers: dict[str, str], test_project: Project
+) -> None:
     """Test listing projects."""
     response = await client.get("/projects", headers=auth_headers)
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert "projects" in data
-    assert "total" in data
-    assert data["total"] >= 1
-    assert any(p["project_id"] == test_project.project_id for p in data["projects"])
+    data = ProjectListResponse.model_validate(response.json())
+    assert data.total >= 1
+    assert any(p.project_id == test_project.project_id for p in data.projects)
 
 
 @pytest.mark.asyncio
-async def test_list_projects_unauthorized(client: AsyncClient):
+async def test_list_projects_unauthorized(client: AsyncClient) -> None:
     """Test listing projects without authentication."""
     response = await client.get("/projects")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -76,20 +77,22 @@ async def test_list_projects_unauthorized(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_get_project(
-    client: AsyncClient, auth_headers: dict, test_project: Project
-):
+    client: AsyncClient, auth_headers: dict[str, str], test_project: Project
+) -> None:
     """Test getting a specific project."""
     response = await client.get(
         f"/projects/{test_project.project_id}", headers=auth_headers
     )
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["project_id"] == test_project.project_id
-    assert data["name"] == test_project.name
+    data = ProjectResponse.model_validate(response.json())
+    assert data.project_id == test_project.project_id
+    assert data.name == test_project.name
 
 
 @pytest.mark.asyncio
-async def test_get_project_not_found(client: AsyncClient, auth_headers: dict):
+async def test_get_project_not_found(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
     """Test getting non-existent project."""
     response = await client.get(
         "/projects/00000000-0000-0000-0000-000000000000", headers=auth_headers
@@ -99,8 +102,8 @@ async def test_get_project_not_found(client: AsyncClient, auth_headers: dict):
 
 @pytest.mark.asyncio
 async def test_update_project(
-    client: AsyncClient, auth_headers: dict, test_project: Project
-):
+    client: AsyncClient, auth_headers: dict[str, str], test_project: Project
+) -> None:
     """Test updating a project."""
     response = await client.patch(
         f"/projects/{test_project.project_id}",
@@ -108,13 +111,15 @@ async def test_update_project(
         json={"name": "Updated Project Name"},
     )
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["name"] == "Updated Project Name"
-    assert data["project_id"] == test_project.project_id
+    data = ProjectResponse.model_validate(response.json())
+    assert data.name == "Updated Project Name"
+    assert data.project_id == test_project.project_id
 
 
 @pytest.mark.asyncio
-async def test_update_project_not_found(client: AsyncClient, auth_headers: dict):
+async def test_update_project_not_found(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
     """Test updating non-existent project."""
     response = await client.patch(
         "/projects/00000000-0000-0000-0000-000000000000",
@@ -126,8 +131,8 @@ async def test_update_project_not_found(client: AsyncClient, auth_headers: dict)
 
 @pytest.mark.asyncio
 async def test_delete_project(
-    client: AsyncClient, auth_headers: dict, test_project: Project
-):
+    client: AsyncClient, auth_headers: dict[str, str], test_project: Project
+) -> None:
     """Test deleting a project."""
     response = await client.delete(
         f"/projects/{test_project.project_id}", headers=auth_headers
@@ -142,7 +147,9 @@ async def test_delete_project(
 
 
 @pytest.mark.asyncio
-async def test_delete_project_not_found(client: AsyncClient, auth_headers: dict):
+async def test_delete_project_not_found(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
     """Test deleting non-existent project."""
     response = await client.delete(
         "/projects/00000000-0000-0000-0000-000000000000", headers=auth_headers

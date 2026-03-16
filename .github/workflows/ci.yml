@@ -37,7 +37,7 @@ jobs:
         run: uv sync --frozen
 
       - name: Run mypy
-        run: uv run mypy app/
+        run: uv run mypy app/ tests/
 
   test:
     name: Tests
