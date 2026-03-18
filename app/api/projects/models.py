@@ -1,6 +1,7 @@
 """Project database models."""
 
 import uuid
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -9,7 +10,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.api.core.database import Base
 
 if TYPE_CHECKING:
+    from app.api.auth.models import User
     from app.api.issues.models import Issue
+
+
+class ProjectMemberRole(StrEnum):
+    """Project member role enumeration."""
+
+    OWNER = "owner"
+    MEMBER = "member"
+    VIEWER = "viewer"
 
 
 class Project(Base):
@@ -25,12 +35,33 @@ class Project(Base):
     key: Mapped[str] = mapped_column(
         sa.String(10), nullable=False, unique=True, index=True
     )
-    owner_id: Mapped[str] = mapped_column(
-        sa.ForeignKey("auth_user.user_id", ondelete="CASCADE"),
-        nullable=False,
-    )
 
     # Relationships
     issues: Mapped[list[Issue]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    members: Mapped[list[ProjectMember]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+
+
+class ProjectMember(Base):
+    """Project member model - links users to projects with roles."""
+
+    __tablename__ = "project_member"
+
+    project_id: Mapped[str] = mapped_column(
+        sa.ForeignKey("project.project_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        sa.ForeignKey("auth_user.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    role: Mapped[ProjectMemberRole] = mapped_column(
+        sa.Enum(ProjectMemberRole), nullable=False
+    )
+
+    # Relationships
+    project: Mapped[Project] = relationship(back_populates="members")
+    user: Mapped[User] = relationship(back_populates="project_memberships")

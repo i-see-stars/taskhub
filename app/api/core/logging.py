@@ -1,8 +1,9 @@
 """Logging configuration for the application."""
 
+import json
 import logging
 import sys
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from app.api.core.config import settings
@@ -13,9 +14,6 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
-        import json
-        from datetime import datetime
-
         log_data: dict[str, Any] = {
             "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,

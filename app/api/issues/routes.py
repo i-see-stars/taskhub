@@ -14,9 +14,80 @@ from app.api.issues.schemas import (
     IssueResponse,
     IssueUpdate,
 )
-from app.api.projects.models import Project
+from app.api.projects.models import Project, ProjectMember, ProjectMemberRole
 
 router = APIRouter(prefix="/issues", tags=["issues"])
+
+
+async def _require_project_member(
+    project_id: str,
+    session: AsyncSession,
+    current_user: User,
+) -> ProjectMember:
+    """Verify the current user is a member of the given project.
+
+    Args:
+        project_id: The project UUID.
+        session: Database session.
+        current_user: The authenticated user.
+
+    Returns:
+        The user's ProjectMember record.
+
+    Raises:
+        HTTPException: 404 if project not found, 403 if user is not a member.
+    """
+    project_result = await session.execute(
+        select(Project).where(Project.project_id == project_id)
+    )
+    if not project_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    member_result = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == current_user.user_id,
+        )
+    )
+    member = member_result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+    return member
+
+
+async def _validate_assignee(
+    assignee_id: str,
+    project_id: str,
+    session: AsyncSession,
+) -> None:
+    """Validate that the assignee is a member of the project.
+
+    Args:
+        assignee_id: The user ID to assign.
+        project_id: The project UUID.
+        session: Database session.
+
+    Raises:
+        HTTPException: 400 if assignee is not a project member.
+    """
+    member_result = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == assignee_id,
+        )
+    )
+    if not member_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assignee must be a member of the project",
+        )
 
 
 @router.get("", response_model=IssueListResponse)
@@ -25,15 +96,23 @@ async def list_issues(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> IssueListResponse:
-    """List all issues for current user (optionally filtered by project)."""
-    query = select(Issue).join(Project).where(Project.owner_id == current_user.user_id)
+    """List all issues accessible to current user (optionally filtered by project)."""
+    query = (
+        select(Issue)
+        .join(Project, Issue.project_id == Project.project_id)
+        .join(
+            ProjectMember,
+            (ProjectMember.project_id == Project.project_id)
+            & (ProjectMember.user_id == current_user.user_id),
+        )
+    )
 
     if project_id:
         query = query.where(Issue.project_id == project_id)
 
     result = await session.execute(query)
     issues = result.scalars().all()
-    return IssueListResponse(issues=issues, total=len(issues))
+    return IssueListResponse(issues=list(issues), total=len(issues))
 
 
 @router.post("", response_model=IssueResponse, status_code=status.HTTP_201_CREATED)
@@ -43,21 +122,15 @@ async def create_issue(
     current_user: User = Depends(get_current_user),
 ) -> Issue:
     """Create a new issue."""
-    # Verify project exists and user owns it
-    project_result = await session.execute(
-        select(Project).where(
-            Project.project_id == issue_data.project_id,
-            Project.owner_id == current_user.user_id,
-        )
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
+    member = await _require_project_member(issue_data.project_id, session, current_user)
+
+    if member.role == ProjectMemberRole.VIEWER:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Viewers cannot create issues",
         )
 
-    # Verify parent issue exists if provided
+    # Validate parent issue belongs to the same project
     if issue_data.parent_id:
         parent_result = await session.execute(
             select(Issue).where(
@@ -70,6 +143,10 @@ async def create_issue(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Parent issue not found",
             )
+
+    # Validate assignee is a project member
+    if issue_data.assignee_id:
+        await _validate_assignee(issue_data.assignee_id, issue_data.project_id, session)
 
     issue = Issue(
         **issue_data.model_dump(),
@@ -90,11 +167,13 @@ async def get_issue(
     """Get issue by ID."""
     result = await session.execute(
         select(Issue)
-        .join(Project)
-        .where(
-            Issue.issue_id == issue_id,
-            Project.owner_id == current_user.user_id,
+        .join(Project, Issue.project_id == Project.project_id)
+        .join(
+            ProjectMember,
+            (ProjectMember.project_id == Project.project_id)
+            & (ProjectMember.user_id == current_user.user_id),
         )
+        .where(Issue.issue_id == issue_id)
     )
     issue = result.scalar_one_or_none()
     if not issue:
@@ -112,14 +191,16 @@ async def update_issue(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Issue:
-    """Update issue."""
+    """Update issue. Requires member or owner role."""
     result = await session.execute(
         select(Issue)
-        .join(Project)
-        .where(
-            Issue.issue_id == issue_id,
-            Project.owner_id == current_user.user_id,
+        .join(Project, Issue.project_id == Project.project_id)
+        .join(
+            ProjectMember,
+            (ProjectMember.project_id == Project.project_id)
+            & (ProjectMember.user_id == current_user.user_id),
         )
+        .where(Issue.issue_id == issue_id)
     )
     issue = result.scalar_one_or_none()
     if not issue:
@@ -128,8 +209,27 @@ async def update_issue(
             detail="Issue not found",
         )
 
-    # Update fields
-    for field, value in issue_data.model_dump(exclude_unset=True).items():
+    # Check role
+    member_result = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == issue.project_id,
+            ProjectMember.user_id == current_user.user_id,
+        )
+    )
+    member = member_result.scalar_one_or_none()
+    if member and member.role == ProjectMemberRole.VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Viewers cannot modify issues",
+        )
+
+    update_data = issue_data.model_dump(exclude_unset=True)
+
+    # Validate assignee if being changed to a non-null value
+    if "assignee_id" in update_data and update_data["assignee_id"] is not None:
+        await _validate_assignee(update_data["assignee_id"], issue.project_id, session)
+
+    for field, value in update_data.items():
         setattr(issue, field, value)
 
     await session.commit()
@@ -143,20 +243,35 @@ async def delete_issue(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    """Delete issue."""
+    """Delete issue. Requires member or owner role."""
     result = await session.execute(
         select(Issue)
-        .join(Project)
-        .where(
-            Issue.issue_id == issue_id,
-            Project.owner_id == current_user.user_id,
+        .join(Project, Issue.project_id == Project.project_id)
+        .join(
+            ProjectMember,
+            (ProjectMember.project_id == Project.project_id)
+            & (ProjectMember.user_id == current_user.user_id),
         )
+        .where(Issue.issue_id == issue_id)
     )
     issue = result.scalar_one_or_none()
     if not issue:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Issue not found",
+        )
+
+    member_result = await session.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == issue.project_id,
+            ProjectMember.user_id == current_user.user_id,
+        )
+    )
+    member = member_result.scalar_one_or_none()
+    if member and member.role == ProjectMemberRole.VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Viewers cannot delete issues",
         )
 
     await session.delete(issue)
