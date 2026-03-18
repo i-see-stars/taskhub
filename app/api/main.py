@@ -5,10 +5,12 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from sqlalchemy import text
 
 from app.api.auth.routes import router as auth_router
 from app.api.comments.routes import router as comments_router
 from app.api.core.config import settings
+from app.api.core.database import engine
 from app.api.core.logging import setup_logging
 from app.api.issues.routes import router as issues_router
 from app.api.projects.routes import router as projects_router
@@ -54,10 +56,6 @@ async def root() -> dict[str, str]:
 @app.get("/health")
 async def health() -> dict[str, str]:
     """Health check endpoint with database connectivity verification."""
-    from sqlalchemy import text
-
-    from app.api.core.database import engine
-
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))

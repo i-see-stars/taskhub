@@ -206,10 +206,8 @@ async def add_member(
         )
 
     # Check target user exists
-    from app.api.auth.models import User as UserModel
-
     user_result = await session.execute(
-        select(UserModel).where(UserModel.user_id == member_data.user_id)
+        select(User).where(User.user_id == member_data.user_id)
     )
     if not user_result.scalar_one_or_none():
         raise HTTPException(

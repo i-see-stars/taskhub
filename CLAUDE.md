@@ -91,6 +91,7 @@ make clean          # Clean cache files
 - Use `pytest` + `pytest-asyncio` for async tests
 - All functions/methods/classes must have English docstrings (Google style)
 - Do not use `--unsafe-fixes` with Ruff
+- **Never import inside functions or methods.** All imports must be at the top of the module. The only exception is `if TYPE_CHECKING:` blocks for avoiding circular imports.
 
 ### SOLID Principles
 
