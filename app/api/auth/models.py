@@ -1,11 +1,15 @@
 """Auth database models."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.api.core.database import Base
+
+if TYPE_CHECKING:
+    from app.api.projects.models import ProjectMember
 
 
 class User(Base):
@@ -22,6 +26,9 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(sa.String(128), nullable=False)
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")  # noqa: UP037
+    project_memberships: Mapped[list[ProjectMember]] = relationship(
+        back_populates="user"
+    )  # noqa: UP037
 
 
 class RefreshToken(Base):

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.auth.routes import router as auth_router
+from app.api.comments.routes import router as comments_router
 from app.api.core.config import settings
 from app.api.core.logging import setup_logging
 from app.api.issues.routes import router as issues_router
@@ -41,6 +42,7 @@ if settings.CORS_ORIGINS:
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(projects_router)
 app.include_router(issues_router)
+app.include_router(comments_router)
 
 
 @app.get("/")

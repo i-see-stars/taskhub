@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.api.core.database import Base
 
 if TYPE_CHECKING:
+    from app.api.comments.models import Comment
     from app.api.projects.models import Project
 
 
@@ -88,4 +89,7 @@ class Issue(Base):
     )
     children: Mapped[list[Issue]] = relationship(
         "Issue", back_populates="parent", cascade="all, delete-orphan"
+    )
+    comments: Mapped[list[Comment]] = relationship(
+        back_populates="issue", cascade="all, delete-orphan"
     )

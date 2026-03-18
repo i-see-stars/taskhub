@@ -4,6 +4,7 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
+from app.api.auth.models import User
 from app.api.issues.models import Issue
 from app.api.issues.schemas import IssueListResponse, IssueResponse
 from app.api.projects.models import Project
@@ -68,6 +69,25 @@ async def test_create_issue_unauthorized(
 
 
 @pytest.mark.asyncio
+async def test_create_issue_forbidden_for_viewer(
+    client: AsyncClient,
+    viewer_auth_headers: dict[str, str],
+    test_project_with_viewer: Project,
+) -> None:
+    """Test that viewers cannot create issues."""
+    response = await client.post(
+        "/issues",
+        headers=viewer_auth_headers,
+        json={
+            "title": "Sneaky Issue",
+            "type": "task",
+            "project_id": test_project_with_viewer.project_id,
+        },
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
 async def test_create_issue_with_parent(
     client: AsyncClient,
     auth_headers: dict[str, str],
@@ -88,6 +108,50 @@ async def test_create_issue_with_parent(
     assert response.status_code == status.HTTP_201_CREATED
     data = IssueResponse.model_validate(response.json())
     assert data.parent_id == test_issue.issue_id
+
+
+@pytest.mark.asyncio
+async def test_create_issue_assignee_not_member(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_project: Project,
+    test_member_user: User,
+) -> None:
+    """Test that assigning a non-member returns 400."""
+    response = await client.post(
+        "/issues",
+        headers=auth_headers,
+        json={
+            "title": "Assigned Issue",
+            "type": "task",
+            "project_id": test_project.project_id,
+            "assignee_id": test_member_user.user_id,
+        },
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.asyncio
+async def test_create_issue_assignee_is_member(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_project_with_member: Project,
+    test_member_user: User,
+) -> None:
+    """Test assigning an issue to a valid project member."""
+    response = await client.post(
+        "/issues",
+        headers=auth_headers,
+        json={
+            "title": "Assigned Issue",
+            "type": "task",
+            "project_id": test_project_with_member.project_id,
+            "assignee_id": test_member_user.user_id,
+        },
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    data = IssueResponse.model_validate(response.json())
+    assert data.assignee_id == test_member_user.user_id
 
 
 @pytest.mark.asyncio
@@ -165,6 +229,22 @@ async def test_update_issue(
 
 
 @pytest.mark.asyncio
+async def test_update_issue_assignee_not_member(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_issue: Issue,
+    test_member_user: User,
+) -> None:
+    """Test updating issue with assignee who is not a project member returns 400."""
+    response = await client.patch(
+        f"/issues/{test_issue.issue_id}",
+        headers=auth_headers,
+        json={"assignee_id": test_member_user.user_id},
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.asyncio
 async def test_update_issue_not_found(
     client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
@@ -187,7 +267,6 @@ async def test_delete_issue(
     )
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    # Verify issue is deleted
     get_response = await client.get(
         f"/issues/{test_issue.issue_id}", headers=auth_headers
     )
