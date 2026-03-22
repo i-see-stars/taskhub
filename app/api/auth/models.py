@@ -24,6 +24,12 @@ class User(Base):
         sa.String(256), nullable=False, unique=True, index=True
     )
     hashed_password: Mapped[str] = mapped_column(sa.String(128), nullable=False)
+    notify_in_app: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=sa.text("true")
+    )
+    notify_email: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=sa.text("true")
+    )
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")  # noqa: UP037
     project_memberships: Mapped[list[ProjectMember]] = relationship(
