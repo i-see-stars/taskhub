@@ -13,6 +13,7 @@ from app.api.comments.models import Comment  # noqa: F401
 from app.api.core.config import settings
 from app.api.core.database import Base
 from app.api.issues.models import Issue  # noqa: F401
+from app.api.notifications.models import Notification  # noqa: F401
 from app.api.projects.models import Project  # noqa: F401
 
 # this is the Alembic Config object, which provides
