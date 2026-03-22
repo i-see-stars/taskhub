@@ -14,6 +14,9 @@ from app.api.issues.schemas import (
     IssueResponse,
     IssueUpdate,
 )
+from app.api.issues.services import IssueService
+from app.api.notifications.deps import get_notification_dispatcher
+from app.api.notifications.services import NotificationDispatcher
 from app.api.projects.models import Project, ProjectMember, ProjectMemberRole
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -190,51 +193,11 @@ async def update_issue(
     issue_data: IssueUpdate,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    dispatcher: NotificationDispatcher = Depends(get_notification_dispatcher),
 ) -> Issue:
     """Update issue. Requires member or owner role."""
-    result = await session.execute(
-        select(Issue)
-        .join(Project, Issue.project_id == Project.project_id)
-        .join(
-            ProjectMember,
-            (ProjectMember.project_id == Project.project_id)
-            & (ProjectMember.user_id == current_user.user_id),
-        )
-        .where(Issue.issue_id == issue_id)
-    )
-    issue = result.scalar_one_or_none()
-    if not issue:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Issue not found",
-        )
-
-    # Check role
-    member_result = await session.execute(
-        select(ProjectMember).where(
-            ProjectMember.project_id == issue.project_id,
-            ProjectMember.user_id == current_user.user_id,
-        )
-    )
-    member = member_result.scalar_one_or_none()
-    if member and member.role == ProjectMemberRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewers cannot modify issues",
-        )
-
-    update_data = issue_data.model_dump(exclude_unset=True)
-
-    # Validate assignee if being changed to a non-null value
-    if "assignee_id" in update_data and update_data["assignee_id"] is not None:
-        await _validate_assignee(update_data["assignee_id"], issue.project_id, session)
-
-    for field, value in update_data.items():
-        setattr(issue, field, value)
-
-    await session.commit()
-    await session.refresh(issue)
-    return issue
+    service = IssueService(session=session, dispatcher=dispatcher)
+    return await service.update_issue(issue_id, issue_data, current_user)
 
 
 @router.delete("/{issue_id}", status_code=status.HTTP_204_NO_CONTENT)

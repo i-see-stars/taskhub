@@ -12,6 +12,7 @@ from app.api.notifications.schemas import (
     NotificationListResponse,
     NotificationResponse,
 )
+from app.api.projects.models import Project
 
 
 @pytest.fixture
@@ -107,3 +108,76 @@ async def test_mark_notification_read_forbidden(
         headers=member_auth_headers,
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_assign_issue_creates_notification(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_project_with_member: Project,  # noqa: ARG001
+    test_member_user: User,
+    test_issue: Issue,
+) -> None:
+    """Test that assigning an issue creates a notification for the assignee."""
+    # Assign the issue to member user
+    response = await client.patch(
+        f"/issues/{test_issue.issue_id}",
+        headers=auth_headers,
+        json={"assignee_id": test_member_user.user_id},
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    # Check that a notification was created for the member
+    member_response = await client.post(
+        "/auth/access-token",
+        data={
+            "username": test_member_user.email,
+            "password": "testpassword123",
+        },
+    )
+    member_token = member_response.json()["access_token"]
+    member_headers = {"Authorization": f"Bearer {member_token}"}
+
+    notif_response = await client.get("/notifications", headers=member_headers)
+    assert notif_response.status_code == status.HTTP_200_OK
+    data = NotificationListResponse.model_validate(notif_response.json())
+    assert data.total >= 1
+    assert any(n.issue_id == test_issue.issue_id for n in data.notifications)
+
+
+@pytest.mark.asyncio
+async def test_assign_issue_no_notification_when_same_assignee(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    member_auth_headers: dict[str, str],
+    test_project_with_member: Project,  # noqa: ARG001
+    test_member_user: User,
+    test_issue: Issue,
+) -> None:
+    """Test that re-assigning to the same user does not create duplicate notification."""
+    # First assignment
+    await client.patch(
+        f"/issues/{test_issue.issue_id}",
+        headers=auth_headers,
+        json={"assignee_id": test_member_user.user_id},
+    )
+
+    # Get notification count
+    notif_response = await client.get("/notifications", headers=member_auth_headers)
+    count_after_first = NotificationListResponse.model_validate(
+        notif_response.json()
+    ).total
+
+    # Same assignment again (no-op)
+    await client.patch(
+        f"/issues/{test_issue.issue_id}",
+        headers=auth_headers,
+        json={"assignee_id": test_member_user.user_id},
+    )
+
+    # Count should not increase
+    notif_response = await client.get("/notifications", headers=member_auth_headers)
+    count_after_second = NotificationListResponse.model_validate(
+        notif_response.json()
+    ).total
+    assert count_after_second == count_after_first
