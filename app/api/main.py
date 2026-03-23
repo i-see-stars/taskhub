@@ -1,6 +1,8 @@
 """Main FastAPI application."""
 
 import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,17 +15,28 @@ from app.api.core.config import settings
 from app.api.core.database import engine
 from app.api.core.logging import setup_logging
 from app.api.issues.routes import router as issues_router
+from app.api.notifications.connection_manager import ConnectionManager
+from app.api.notifications.routes import router as notifications_router
 from app.api.projects.routes import router as projects_router
 
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    """Application lifespan — initialize and clean up resources."""
+    app.state.connection_manager = ConnectionManager()
+    yield
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     debug=settings.DEBUG,
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
+    lifespan=lifespan,
 )
 
 # Security middleware - only in production
@@ -45,6 +58,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(projects_router)
 app.include_router(issues_router)
 app.include_router(comments_router)
+app.include_router(notifications_router)
 
 
 @app.get("/")

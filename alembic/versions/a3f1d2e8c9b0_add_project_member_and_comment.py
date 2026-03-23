@@ -9,6 +9,7 @@ Create Date: 2026-03-18 12:00:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -21,9 +22,11 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # 1. Create projectmemberrole enum
-    projectmemberrole = sa.Enum("OWNER", "MEMBER", "VIEWER", name="projectmemberrole")
-    projectmemberrole.create(op.get_bind())
+    # 1. Create projectmemberrole enum using raw SQL to avoid double-create issue
+    # with asyncpg driver in SQLAlchemy 2.0 async context.
+    op.execute(
+        sa.text("CREATE TYPE projectmemberrole AS ENUM ('OWNER', 'MEMBER', 'VIEWER')")
+    )
 
     # 2. Create project_member table
     op.create_table(
@@ -32,7 +35,9 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(length=36), nullable=False),
         sa.Column(
             "role",
-            sa.Enum("OWNER", "MEMBER", "VIEWER", name="projectmemberrole"),
+            postgresql.ENUM(
+                "OWNER", "MEMBER", "VIEWER", name="projectmemberrole", create_type=False
+            ),
             nullable=False,
         ),
         sa.Column(

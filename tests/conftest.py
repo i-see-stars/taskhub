@@ -30,6 +30,9 @@ from app.api.auth.password import get_password_hash
 from app.api.core.database import Base, get_session
 from app.api.issues.models import Issue, IssuePriority, IssueStatus, IssueType
 from app.api.main import app
+from app.api.notifications.connection_manager import ConnectionManager
+from app.api.notifications.deps import get_notification_dispatcher
+from app.api.notifications.services import NotificationDispatcher
 from app.api.projects.models import Project, ProjectMember, ProjectMemberRole
 
 
@@ -70,11 +73,20 @@ async def db_session(engine: AsyncEngine) -> AsyncGenerator[AsyncSession]:
 @pytest.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
     """Create a test client with database session override."""
+    _connection_manager = ConnectionManager()
 
     async def override_get_session() -> AsyncGenerator[AsyncSession]:
         yield db_session
 
+    def override_get_notification_dispatcher() -> NotificationDispatcher:
+        return NotificationDispatcher(
+            session=db_session, connection_manager=_connection_manager
+        )
+
     app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_notification_dispatcher] = (
+        override_get_notification_dispatcher
+    )
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
