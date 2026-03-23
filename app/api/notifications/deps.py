@@ -1,23 +1,27 @@
 """Notification dependencies."""
 
-from fastapi import Depends, Request
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import HTTPConnection
 
 from app.api.core.database import get_session
 from app.api.notifications.connection_manager import ConnectionManager
 from app.api.notifications.services import NotificationDispatcher
 
 
-def get_connection_manager(request: Request) -> ConnectionManager:
+def get_connection_manager(conn: HTTPConnection) -> ConnectionManager:
     """Get the ConnectionManager from app state.
 
+    Works for both HTTP requests and WebSocket connections,
+    since both inherit from HTTPConnection.
+
     Args:
-        request: The incoming request.
+        conn: The incoming HTTP or WebSocket connection.
 
     Returns:
         The ConnectionManager instance.
     """
-    return request.app.state.connection_manager  # type: ignore[no-any-return]
+    return conn.app.state.connection_manager  # type: ignore[no-any-return]
 
 
 def get_notification_dispatcher(
