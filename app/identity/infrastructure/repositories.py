@@ -184,7 +184,9 @@ class PostgresRefreshTokenRepository(RefreshTokenRepository):
             TokenNotFound: If the token is not found.
         """
         result = await self._session.execute(
-            select(RefreshTokenModel).where(RefreshTokenModel.refresh_token == token)
+            select(RefreshTokenModel)
+            .where(RefreshTokenModel.refresh_token == token)
+            .with_for_update(skip_locked=True)
         )
         model = result.scalar_one_or_none()
         if model is None:
