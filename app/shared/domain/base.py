@@ -13,7 +13,7 @@ class Entity:
     """Base class for domain entities. Equality is based on identity, not value."""
 
     def __eq__(self, other: object) -> bool:
-        """Compare by the first dataclass field (the id field).
+        """Compare by the field named 'id', falling back to first field.
 
         Args:
             other: The object to compare.
@@ -24,22 +24,28 @@ class Entity:
         if not isinstance(other, self.__class__):
             return False
         fields = dataclasses.fields(self)
-        if not fields:
-            return False
-        id_field = fields[0].name
-        return bool(getattr(self, id_field) == getattr(other, id_field))
+        id_field_name = next(
+            (f.name for f in fields if f.name == "id"),
+            fields[0].name if fields else None,
+        )
+        if id_field_name is None:
+            return self is other
+        return bool(getattr(self, id_field_name) == getattr(other, id_field_name))
 
     def __hash__(self) -> int:
-        """Hash by identity field.
+        """Hash by the field named 'id', falling back to first field.
 
         Returns:
             Hash of the identity field value.
         """
         fields = dataclasses.fields(self)
-        if not fields:
+        id_field_name = next(
+            (f.name for f in fields if f.name == "id"),
+            fields[0].name if fields else None,
+        )
+        if id_field_name is None:
             return hash(id(self))
-        id_field = fields[0].name
-        return hash(getattr(self, id_field))
+        return hash(getattr(self, id_field_name))
 
 
 @dataclass(eq=False)
@@ -49,6 +55,14 @@ class AggregateRoot(Entity):
     def __post_init__(self) -> None:
         """Initialize the events list."""
         self._events: list[DomainEvent] = []
+
+    def _register_event(self, event: DomainEvent) -> None:
+        """Add a domain event to the pending events list.
+
+        Args:
+            event: The domain event to register.
+        """
+        self._events.append(event)
 
     def pull_events(self) -> list[DomainEvent]:
         """Return all collected events and clear the internal list.

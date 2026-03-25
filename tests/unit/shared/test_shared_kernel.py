@@ -45,11 +45,40 @@ def test_aggregate_root_collects_and_clears_events() -> None:
 
     agg = MyAggregate(id="x")
     event = MyEvent(aggregate_id="x", occurred_at=datetime.now(UTC))
-    agg._events.append(event)
+    agg._register_event(event)
 
     pulled = agg.pull_events()
     assert pulled == [event]
     assert agg.pull_events() == []  # cleared after pull
+
+
+def test_entity_not_equal_to_non_entity() -> None:
+    """Test that an entity compared to a non-Entity object returns False."""
+
+    @dataclass(eq=False)
+    class MyEntity(Entity):
+        id: str
+
+    e = MyEntity(id="1")
+    assert e != "1"
+    assert e != 1
+    assert e != None  # noqa: E711
+
+
+def test_entity_hash_uses_id_field() -> None:
+    """Test that entity hash is based on the id field value."""
+
+    @dataclass(eq=False)
+    class MyEntity(Entity):
+        id: str
+        name: str
+
+    e1 = MyEntity(id="abc", name="Alice")
+    e2 = MyEntity(id="abc", name="Bob")
+    e3 = MyEntity(id="xyz", name="Alice")
+
+    assert hash(e1) == hash(e2)
+    assert hash(e1) != hash(e3)
 
 
 def test_value_object_equality_by_value() -> None:
