@@ -10,6 +10,7 @@ import logging
 import secrets
 import time
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.core.config import settings  # updated to app.core.config in Task 13
@@ -17,6 +18,8 @@ from app.identity.domain.entities import RefreshToken, User
 from app.identity.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidCredentials,
+    TokenAlreadyUsed,
+    TokenExpired,
     UserNotFound,
 )
 from app.identity.domain.repositories import RefreshTokenRepository, UserRepository
@@ -71,8 +74,13 @@ class RegisterUseCase:
             email=email_vo,
             hashed_password=hashed,
         )
-        saved = await self._user_repo.save(user)
-        await self._session.commit()
+        try:
+            saved = await self._user_repo.save(user)
+            await self._session.commit()
+        except IntegrityError:
+            await self._session.rollback()
+            raise EmailAlreadyRegistered(email) from None
+        # TODO: emit UserRegistered event via event bus
         return saved
 
 
@@ -168,9 +176,9 @@ class RefreshTokenUseCase:
         token = await self._token_repo.get_by_token(refresh_token)
 
         if time.time() > token.exp:
-            raise InvalidCredentials("Refresh token expired")
+            raise TokenExpired("Refresh token expired")
         if token.used:
-            raise InvalidCredentials("Refresh token already used")
+            raise TokenAlreadyUsed("Refresh token already used")
 
         # Mark old token used
         used_token = RefreshToken(
@@ -228,6 +236,7 @@ class ChangePasswordUseCase:
         )
         await self._user_repo.save(updated)
         await self._session.commit()
+        # TODO: emit PasswordChanged event via event bus
 
 
 class DeleteAccountUseCase:

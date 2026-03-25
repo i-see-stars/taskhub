@@ -19,3 +19,11 @@ class InvalidEmail(Exception):
 
 class TokenNotFound(Exception):
     """Raised when a refresh token cannot be found."""
+
+
+class TokenExpired(Exception):
+    """Raised when a refresh token has expired."""
+
+
+class TokenAlreadyUsed(Exception):
+    """Raised when a refresh token has already been used."""

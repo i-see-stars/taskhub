@@ -58,4 +58,4 @@ def test_user_default_preferences() -> None:
         hashed_password="hashed",
     )
     assert user.preferences.notify_in_app is True
-    assert user.preferences.notify_email is False
+    assert user.preferences.notify_email is True

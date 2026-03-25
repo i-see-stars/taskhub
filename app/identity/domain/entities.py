@@ -22,7 +22,7 @@ class User(AggregateRoot):
     hashed_password: str
     preferences: NotificationPreferences = field(
         default_factory=lambda: NotificationPreferences(
-            notify_in_app=True, notify_email=False
+            notify_in_app=True, notify_email=True
         )
     )
 

@@ -18,6 +18,8 @@ from app.identity.application.use_cases import (
 from app.identity.domain.exceptions import (
     EmailAlreadyRegistered,
     InvalidCredentials,
+    TokenAlreadyUsed,
+    TokenExpired,
     TokenNotFound,
 )
 from app.identity.infrastructure import api_messages
@@ -140,13 +142,12 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=api_messages.REFRESH_TOKEN_NOT_FOUND,
         ) from None
-    except InvalidCredentials as e:
-        detail = str(e)
-        if "expired" in detail.lower():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=api_messages.REFRESH_TOKEN_EXPIRED,
-            ) from None
+    except TokenExpired:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=api_messages.REFRESH_TOKEN_EXPIRED,
+        ) from None
+    except TokenAlreadyUsed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=api_messages.REFRESH_TOKEN_ALREADY_USED,
