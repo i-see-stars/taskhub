@@ -95,3 +95,22 @@ async def test_event_bus_swallows_handler_exceptions() -> None:
 
     # Must not raise
     await bus.publish(OrderPlaced(order_id="x", occurred_at=datetime.now(UTC)))
+
+
+@pytest.mark.asyncio
+async def test_event_bus_continues_after_handler_failure() -> None:
+    """Subsequent handlers must run even when an earlier handler raises."""
+    results: list[str] = []
+
+    async def failing_handler(_event: DomainEvent) -> None:
+        raise RuntimeError("boom")
+
+    async def succeeding_handler(_event: DomainEvent) -> None:
+        results.append("ok")
+
+    bus = EventBus()
+    bus.subscribe(OrderPlaced, failing_handler)
+    bus.subscribe(OrderPlaced, succeeding_handler)
+
+    await bus.publish(OrderPlaced(order_id="x", occurred_at=datetime.now(UTC)))
+    assert results == ["ok"]
