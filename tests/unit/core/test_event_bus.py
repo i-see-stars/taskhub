@@ -72,7 +72,7 @@ async def test_event_bus_multiple_handlers_for_same_event() -> None:
     bus.subscribe(OrderPlaced, handler_b)
 
     await bus.publish(OrderPlaced(order_id="1", occurred_at=datetime.now(UTC)))
-    assert sorted(results) == ["a", "b"]
+    assert results == ["a", "b"]
 
 
 @pytest.mark.asyncio
@@ -80,4 +80,18 @@ async def test_empty_event_bus_is_safe() -> None:
     """Test that publishing to empty bus does not raise."""
     bus = EventBus()
     # No subscriptions — should not raise
+    await bus.publish(OrderPlaced(order_id="x", occurred_at=datetime.now(UTC)))
+
+
+@pytest.mark.asyncio
+async def test_event_bus_swallows_handler_exceptions() -> None:
+    """Handler exceptions must not propagate out of publish()."""
+
+    async def failing_handler(_event: DomainEvent) -> None:
+        raise RuntimeError("handler failed")
+
+    bus = EventBus()
+    bus.subscribe(OrderPlaced, failing_handler)
+
+    # Must not raise
     await bus.publish(OrderPlaced(order_id="x", occurred_at=datetime.now(UTC)))

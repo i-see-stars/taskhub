@@ -5,13 +5,12 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from app.shared.domain.events import DomainEvent
 
 logger = logging.getLogger(__name__)
 
-EventHandler = Callable[[Any], Awaitable[None]]
+EventHandler = Callable[[DomainEvent], Awaitable[None]]
 
 
 class EventBus:
