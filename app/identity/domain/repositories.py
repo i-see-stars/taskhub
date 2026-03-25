@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from app.identity.domain.entities import RefreshToken, User
+from app.identity.domain.value_objects import Email
 from app.shared.domain.identifiers import UserId
 
 
@@ -26,11 +27,11 @@ class UserRepository(ABC):
         """
 
     @abstractmethod
-    async def get_by_email(self, email: str) -> User:
+    async def get_by_email(self, email: Email) -> User:
         """Fetch user by email.
 
         Args:
-            email: The user's email address.
+            email: The user's Email value object.
 
         Returns:
             The User aggregate.
