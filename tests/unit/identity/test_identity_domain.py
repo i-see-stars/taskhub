@@ -2,8 +2,10 @@
 
 import pytest
 
+from app.identity.domain.entities import User
 from app.identity.domain.exceptions import InvalidEmail
 from app.identity.domain.value_objects import Email, NotificationPreferences
+from app.shared.domain.identifiers import UserId
 
 
 def test_email_valid() -> None:
@@ -36,3 +38,24 @@ def test_notification_preferences_immutable() -> None:
     prefs = NotificationPreferences(notify_in_app=True, notify_email=True)
     with pytest.raises((AttributeError, TypeError)):
         prefs.notify_in_app = False  # type: ignore[misc]
+
+
+def test_user_entity_equality() -> None:
+    """Test that User equality is determined by ID only."""
+    uid = UserId("abc")
+    u1 = User(id=uid, email=Email(value="a@b.com"), hashed_password="x")
+    u2 = User(id=uid, email=Email(value="c@d.com"), hashed_password="y")
+    u3 = User(id=UserId("xyz"), email=Email(value="a@b.com"), hashed_password="x")
+    assert u1 == u2  # same id
+    assert u1 != u3  # different id
+
+
+def test_user_default_preferences() -> None:
+    """Test that User has correct default notification preferences."""
+    user = User(
+        id=UserId("1"),
+        email=Email(value="test@example.com"),
+        hashed_password="hashed",
+    )
+    assert user.preferences.notify_in_app is True
+    assert user.preferences.notify_email is False

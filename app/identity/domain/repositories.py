@@ -73,7 +73,7 @@ class RefreshTokenRepository(ABC):
             The RefreshToken entity.
 
         Raises:
-            UserNotFound: If token is not found (treated as invalid).
+            TokenNotFound: If the token is not found or has expired.
         """
 
     @abstractmethod

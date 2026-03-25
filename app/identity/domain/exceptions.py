@@ -15,3 +15,7 @@ class EmailAlreadyRegistered(Exception):
 
 class InvalidEmail(Exception):
     """Raised when an email address fails format validation."""
+
+
+class TokenNotFound(Exception):
+    """Raised when a refresh token cannot be found."""
