@@ -11,13 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.core.event_bus import EventBus, EventHandler
 from app.identity.infrastructure.models import UserModel
-from app.issue_tracking.application.services import IssueAppService
+from app.issue_tracking.application.services import IssueAppService, ProjectAppService
 from app.issue_tracking.domain.events import IssueAssigned
+from app.issue_tracking.infrastructure.repositories import (
+    PostgresCommentRepository,
+    PostgresIssueRepository,
+    PostgresProjectRepository,
+)
 from app.notifications.application.dispatcher import (
     NotificationContext,
     NotificationDispatcher,
 )
 from app.notifications.infrastructure.connection_manager import ConnectionManager
+from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
 def get_connection_manager(request: Request) -> ConnectionManager:
@@ -85,4 +91,27 @@ def get_issue_app_service(
     Returns:
         Configured IssueAppService.
     """
-    return IssueAppService(session=session, event_bus=event_bus)
+    return IssueAppService(
+        issue_repo=PostgresIssueRepository(session),
+        project_repo=PostgresProjectRepository(session),
+        comment_repo=PostgresCommentRepository(session),
+        uow=SqlAlchemyUnitOfWork(session),
+        event_bus=event_bus,
+    )
+
+
+def get_project_app_service(
+    session: AsyncSession = Depends(get_session),
+) -> ProjectAppService:
+    """Create request-scoped ProjectAppService.
+
+    Args:
+        session: Database session.
+
+    Returns:
+        Configured ProjectAppService.
+    """
+    return ProjectAppService(
+        project_repo=PostgresProjectRepository(session),
+        uow=SqlAlchemyUnitOfWork(session),
+    )
