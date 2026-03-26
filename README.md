@@ -107,6 +107,7 @@ taskhub/
 │   │   └── infrastructure/         # ORM models, repositories, queries, routes
 │   │
 │   ├── notifications/              # Bounded context: in-app & email notifications
+│   │   ├── domain/                 # Notification entity, repository interface
 │   │   ├── application/            # NotificationDispatcher (handles domain events)
 │   │   └── infrastructure/         # ORM model, WebSocket manager, routes
 │   │
@@ -127,6 +128,10 @@ taskhub/
 | **Domain** | Entities, aggregates, value objects, domain events, repository interfaces | Nothing |
 | **Application** | Use cases, orchestration, event publishing | Domain only |
 | **Infrastructure** | ORM models, DB queries, FastAPI routes, external services | Domain + Application |
+
+### CQRS-lite
+
+Read and write paths are intentionally separated. Writes go through domain aggregates and application services to enforce invariants and emit events. Reads bypass aggregates entirely — they query the database directly via optimized JOIN queries in `infrastructure/queries.py` and return response schemas without loading domain objects. This keeps read endpoints fast without sacrificing domain integrity on writes.
 
 ---
 
