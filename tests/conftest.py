@@ -92,6 +92,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
             session=db_session, connection_manager=_connection_manager
         )
 
+    app.state.connection_manager = _connection_manager
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_notification_dispatcher] = (
         override_get_notification_dispatcher

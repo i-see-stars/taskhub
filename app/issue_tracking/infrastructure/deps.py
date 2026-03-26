@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
-from app.core.event_bus import EventBus
+from app.core.event_bus import EventBus, EventHandler
 from app.identity.infrastructure.models import UserModel
 from app.issue_tracking.application.services import IssueAppService
 from app.issue_tracking.domain.events import IssueAssigned
@@ -27,7 +29,7 @@ def get_connection_manager(request: Request) -> ConnectionManager:
     Returns:
         The application's ConnectionManager instance.
     """
-    return request.app.state.connection_manager
+    return cast(ConnectionManager, request.app.state.connection_manager)
 
 
 def get_event_bus(
@@ -66,7 +68,7 @@ def get_event_bus(
                 notify_email=assignee.notify_email,
             )
 
-    bus.subscribe(IssueAssigned, handle_issue_assigned)
+    bus.subscribe(IssueAssigned, cast(EventHandler, handle_issue_assigned))
     return bus
 
 
