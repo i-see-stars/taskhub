@@ -8,13 +8,19 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from app.api.auth.models import RefreshToken, User  # noqa: F401
-from app.api.comments.models import Comment  # noqa: F401
-from app.api.core.config import settings
-from app.api.core.database import Base
-from app.api.issues.models import Issue  # noqa: F401
-from app.api.notifications.models import Notification  # noqa: F401
-from app.api.projects.models import Project  # noqa: F401
+from app.core.config import settings
+from app.core.database import Base
+from app.identity.infrastructure.models import (  # noqa: F401
+    RefreshTokenModel,
+    UserModel,
+)
+from app.issue_tracking.infrastructure.models import (  # noqa: F401
+    CommentModel,
+    IssueModel,
+    ProjectMemberModel,
+    ProjectModel,
+)
+from app.notifications.infrastructure.models import NotificationModel  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

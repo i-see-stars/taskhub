@@ -36,7 +36,7 @@ run:  ## Run development server
 	uv run fastapi dev app/api/main.py
 
 run-prod:  ## Run production server
-	uv run uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+	uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 docker-build:  ## Build Docker image
 	docker build -t taskhub:latest .
