@@ -1,7 +1,7 @@
 """Identity application use cases.
 
 Each use case orchestrates: load → domain logic → save → commit.
-No HTTP or ORM framework knowledge — depends on domain abstractions only.
+Depends on domain abstractions and application ports only.
 """
 
 from __future__ import annotations
@@ -10,10 +10,8 @@ import logging
 import secrets
 import time
 
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.config import settings
+from app.identity.application.ports import AccessToken, PasswordHasher, TokenService
 from app.identity.domain.entities import RefreshToken, User
 from app.identity.domain.exceptions import (
     EmailAlreadyRegistered,
@@ -24,13 +22,8 @@ from app.identity.domain.exceptions import (
 )
 from app.identity.domain.repositories import RefreshTokenRepository, UserRepository
 from app.identity.domain.value_objects import Email
-from app.identity.infrastructure.jwt import JWTToken, create_jwt_token
-from app.identity.infrastructure.password import (
-    DUMMY_PASSWORD,
-    get_password_hash,
-    verify_password,
-)
 from app.shared.domain.identifiers import UserId
+from app.shared.domain.unit_of_work import UnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -38,15 +31,22 @@ logger = logging.getLogger(__name__)
 class RegisterUseCase:
     """Register a new user account."""
 
-    def __init__(self, user_repo: UserRepository, session: AsyncSession) -> None:
-        """Initialize with repositories and session.
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        uow: UnitOfWork,
+        password_hasher: PasswordHasher,
+    ) -> None:
+        """Initialize with repositories, unit of work, and password hasher.
 
         Args:
             user_repo: User repository.
-            session: Database session for committing.
+            uow: Unit of work for transaction management.
+            password_hasher: Password hashing port.
         """
         self._user_repo = user_repo
-        self._session = session
+        self._uow = uow
+        self._password_hasher = password_hasher
 
     async def execute(self, email: str, password: str) -> User:
         """Register a new user.
@@ -68,19 +68,14 @@ class RegisterUseCase:
         except UserNotFound:
             pass
 
-        hashed = get_password_hash(password)
+        hashed = self._password_hasher.hash(password)
         user = User(
             id=UserId(""),  # DB assigns UUID on flush
             email=email_vo,
             hashed_password=hashed,
         )
-        try:
-            saved = await self._user_repo.save(user)
-            await self._session.commit()
-        except IntegrityError:
-            await self._session.rollback()
-            raise EmailAlreadyRegistered(email) from None
-        # TODO: emit UserRegistered event via event bus
+        saved = await self._user_repo.save(user)
+        await self._uow.commit()
         return saved
 
 
@@ -91,28 +86,34 @@ class AuthenticateUseCase:
         self,
         user_repo: UserRepository,
         token_repo: RefreshTokenRepository,
-        session: AsyncSession,
+        uow: UnitOfWork,
+        password_hasher: PasswordHasher,
+        token_service: TokenService,
     ) -> None:
-        """Initialize with repositories and session.
+        """Initialize with repositories, unit of work, and ports.
 
         Args:
             user_repo: User repository.
             token_repo: Refresh token repository.
-            session: Database session for committing.
+            uow: Unit of work for transaction management.
+            password_hasher: Password hashing port.
+            token_service: Token creation port.
         """
         self._user_repo = user_repo
         self._token_repo = token_repo
-        self._session = session
+        self._uow = uow
+        self._password_hasher = password_hasher
+        self._token_service = token_service
 
-    async def execute(self, email: str, password: str) -> tuple[JWTToken, str, int]:
-        """Authenticate and return (jwt_token, refresh_token_str, refresh_token_exp).
+    async def execute(self, email: str, password: str) -> tuple[AccessToken, str, int]:
+        """Authenticate and return (access_token, refresh_token_str, refresh_exp).
 
         Args:
             email: User's email address.
             password: Plaintext password.
 
         Returns:
-            Tuple of (JWTToken, refresh_token_string, refresh_token_exp_timestamp).
+            Tuple of (AccessToken, refresh_token_string, refresh_token_exp).
 
         Raises:
             InvalidCredentials: If credentials are wrong.
@@ -121,13 +122,13 @@ class AuthenticateUseCase:
             user = await self._user_repo.get_by_email(Email(value=email))
         except UserNotFound:
             # Timing-attack mitigation: run dummy hash even on miss
-            verify_password("dummy", DUMMY_PASSWORD)
+            self._password_hasher.dummy_verify()
             raise InvalidCredentials("Invalid credentials") from None
 
-        if not verify_password(password, user.hashed_password):
+        if not self._password_hasher.verify(password, user.hashed_password):
             raise InvalidCredentials("Invalid credentials")
 
-        jwt_token = create_jwt_token(user_id=user.id.value)
+        access_token = self._token_service.create_access_token(user.id.value)
         refresh_token_str = secrets.token_urlsafe(32)
         exp = int(time.time() + settings.jwt_refresh_token_expire_secs)
 
@@ -139,8 +140,8 @@ class AuthenticateUseCase:
             exp=exp,
         )
         await self._token_repo.save(token_entity)
-        await self._session.commit()
-        return jwt_token, refresh_token_str, exp
+        await self._uow.commit()
+        return access_token, refresh_token_str, exp
 
 
 class RefreshTokenUseCase:
@@ -149,29 +150,33 @@ class RefreshTokenUseCase:
     def __init__(
         self,
         token_repo: RefreshTokenRepository,
-        session: AsyncSession,
+        uow: UnitOfWork,
+        token_service: TokenService,
     ) -> None:
         """Initialize.
 
         Args:
             token_repo: Refresh token repository.
-            session: Database session.
+            uow: Unit of work for transaction management.
+            token_service: Token creation port.
         """
         self._token_repo = token_repo
-        self._session = session
+        self._uow = uow
+        self._token_service = token_service
 
-    async def execute(self, refresh_token: str) -> tuple[JWTToken, str, int]:
+    async def execute(self, refresh_token: str) -> tuple[AccessToken, str, int]:
         """Exchange refresh token for new tokens.
 
         Args:
             refresh_token: The refresh token string.
 
         Returns:
-            Tuple of (JWTToken, new_refresh_token_str, exp).
+            Tuple of (AccessToken, new_refresh_token_str, exp).
 
         Raises:
             TokenNotFound: If token not found.
-            InvalidCredentials: If token expired or already used.
+            TokenExpired: If token expired.
+            TokenAlreadyUsed: If token already used.
         """
         token = await self._token_repo.get_by_token(refresh_token)
 
@@ -191,7 +196,7 @@ class RefreshTokenUseCase:
         await self._token_repo.save(used_token)
 
         # Issue new token
-        jwt_token = create_jwt_token(user_id=token.user_id.value)
+        access_token = self._token_service.create_access_token(token.user_id.value)
         new_refresh_str = secrets.token_urlsafe(32)
         exp = int(time.time() + settings.jwt_refresh_token_expire_secs)
 
@@ -203,22 +208,29 @@ class RefreshTokenUseCase:
             exp=exp,
         )
         await self._token_repo.save(new_token)
-        await self._session.commit()
-        return jwt_token, new_refresh_str, exp
+        await self._uow.commit()
+        return access_token, new_refresh_str, exp
 
 
 class ChangePasswordUseCase:
     """Change the current user's password."""
 
-    def __init__(self, user_repo: UserRepository, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        user_repo: UserRepository,
+        uow: UnitOfWork,
+        password_hasher: PasswordHasher,
+    ) -> None:
         """Initialize.
 
         Args:
             user_repo: User repository.
-            session: Database session.
+            uow: Unit of work for transaction management.
+            password_hasher: Password hashing port.
         """
         self._user_repo = user_repo
-        self._session = session
+        self._uow = uow
+        self._password_hasher = password_hasher
 
     async def execute(self, user_id: UserId, new_password: str) -> None:
         """Change user's password.
@@ -231,26 +243,25 @@ class ChangePasswordUseCase:
         updated = User(
             id=user.id,
             email=user.email,
-            hashed_password=get_password_hash(new_password),
+            hashed_password=self._password_hasher.hash(new_password),
             preferences=user.preferences,
         )
         await self._user_repo.save(updated)
-        await self._session.commit()
-        # TODO: emit PasswordChanged event via event bus
+        await self._uow.commit()
 
 
 class DeleteAccountUseCase:
     """Delete the current user's account."""
 
-    def __init__(self, user_repo: UserRepository, session: AsyncSession) -> None:
+    def __init__(self, user_repo: UserRepository, uow: UnitOfWork) -> None:
         """Initialize.
 
         Args:
             user_repo: User repository.
-            session: Database session.
+            uow: Unit of work for transaction management.
         """
         self._user_repo = user_repo
-        self._session = session
+        self._uow = uow
 
     async def execute(self, user_id: UserId) -> None:
         """Delete a user account.
@@ -259,4 +270,4 @@ class DeleteAccountUseCase:
             user_id: The user's ID to delete.
         """
         await self._user_repo.delete(user_id)
-        await self._session.commit()
+        await self._uow.commit()

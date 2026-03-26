@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.identity.domain.entities import RefreshToken, User
-from app.identity.domain.exceptions import TokenNotFound, UserNotFound
+from app.identity.domain.exceptions import (
+    EmailAlreadyRegistered,
+    TokenNotFound,
+    UserNotFound,
+)
 from app.identity.domain.repositories import RefreshTokenRepository, UserRepository
 from app.identity.domain.value_objects import Email, NotificationPreferences
 from app.identity.infrastructure.models import RefreshTokenModel, UserModel
@@ -125,7 +130,11 @@ class PostgresUserRepository(UserRepository):
         model = self._to_model(user, existing)
         if existing is None:
             self._session.add(model)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError:
+            await self._session.rollback()
+            raise EmailAlreadyRegistered(user.email.value) from None
         await self._session.refresh(model)
         return self._to_domain(model)
 
