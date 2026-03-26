@@ -10,7 +10,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.api.core.database import Base  # updated to app.core in Task 13
+from app.core.database import Base
 
 
 class NotificationModel(Base):

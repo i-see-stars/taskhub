@@ -4,7 +4,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import HTTPConnection
 
-from app.api.core.database import get_session
+from app.core.database import get_session
 from app.notifications.application.dispatcher import NotificationDispatcher
 from app.notifications.infrastructure.connection_manager import ConnectionManager
 

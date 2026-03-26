@@ -12,7 +12,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.api.core.database import Base  # updated to app.core in Task 13
+from app.core.database import Base
 from app.issue_tracking.domain.value_objects import (
     IssueStatus,
     IssueType,

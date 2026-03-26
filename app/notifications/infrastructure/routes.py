@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.core.database import get_session
+from app.core.database import get_session
 from app.identity.infrastructure.deps import get_current_user
 from app.identity.infrastructure.jwt import verify_jwt_token
 from app.identity.infrastructure.models import UserModel

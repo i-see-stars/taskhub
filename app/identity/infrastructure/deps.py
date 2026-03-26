@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.core.database import get_session  # updated to app.core in Task 13
+from app.core.database import get_session
 from app.identity.infrastructure import api_messages
 from app.identity.infrastructure.jwt import verify_jwt_token
 from app.identity.infrastructure.models import UserModel

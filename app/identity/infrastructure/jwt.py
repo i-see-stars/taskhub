@@ -6,7 +6,7 @@ import jwt
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 
-from app.api.core.config import settings
+from app.core.config import settings
 
 
 # Payload follows RFC 7519

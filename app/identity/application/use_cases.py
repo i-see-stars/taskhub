@@ -13,7 +13,7 @@ import time
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.core.config import settings  # updated to app.core.config in Task 13
+from app.core.config import settings
 from app.identity.domain.entities import RefreshToken, User
 from app.identity.domain.exceptions import (
     EmailAlreadyRegistered,

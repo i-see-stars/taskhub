@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.core.database import get_session  # updated to app.core in Task 13
+from app.core.database import get_session
 from app.identity.application.use_cases import (
     AuthenticateUseCase,
     ChangePasswordUseCase,
