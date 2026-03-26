@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engin
 from sqlalchemy.pool import NullPool
 
 # Override settings BEFORE importing app
-import app.api.core.config as config_module
-from app.api.core.config import Settings
+import app.core.config as config_module
+from app.core.config import Settings
 
 TEST_DATABASE_URL = "postgresql+asyncpg://taskhub:taskhub@localhost:5432/taskhub_test"
 
@@ -25,15 +25,24 @@ _test_settings = Settings(
 config_module.settings = _test_settings
 
 # Now safe to import app and other modules
-from app.api.auth.models import User
-from app.api.auth.password import get_password_hash
-from app.api.core.database import Base, get_session
-from app.api.issues.models import Issue, IssuePriority, IssueStatus, IssueType
-from app.api.main import app
-from app.api.notifications.connection_manager import ConnectionManager
-from app.api.notifications.deps import get_notification_dispatcher
-from app.api.notifications.services import NotificationDispatcher
-from app.api.projects.models import Project, ProjectMember, ProjectMemberRole
+from app.core.database import Base, get_session
+from app.identity.infrastructure.models import UserModel
+from app.identity.infrastructure.password import get_password_hash
+from app.issue_tracking.domain.value_objects import (
+    IssueStatus,
+    IssueType,
+    Priority,
+    ProjectRole,
+)
+from app.issue_tracking.infrastructure.models import (
+    IssueModel,
+    ProjectMemberModel,
+    ProjectModel,
+)
+from app.main import app
+from app.notifications.application.dispatcher import NotificationDispatcher
+from app.notifications.infrastructure.connection_manager import ConnectionManager
+from app.notifications.infrastructure.deps import get_notification_dispatcher
 
 
 @pytest.fixture(scope="session")
@@ -83,6 +92,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
             session=db_session, connection_manager=_connection_manager
         )
 
+    app.state.connection_manager = _connection_manager
     app.dependency_overrides[get_session] = override_get_session
     app.dependency_overrides[get_notification_dispatcher] = (
         override_get_notification_dispatcher
@@ -98,9 +108,9 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
 
 
 @pytest.fixture
-async def test_user(db_session: AsyncSession) -> User:
+async def test_user(db_session: AsyncSession) -> UserModel:
     """Create a test user (project owner)."""
-    user = User(
+    user = UserModel(
         email="test@example.com",
         hashed_password=get_password_hash("testpassword123"),
     )
@@ -111,9 +121,9 @@ async def test_user(db_session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def test_member_user(db_session: AsyncSession) -> User:
+async def test_member_user(db_session: AsyncSession) -> UserModel:
     """Create a second user to be added as project member."""
-    user = User(
+    user = UserModel(
         email="member@example.com",
         hashed_password=get_password_hash("testpassword123"),
     )
@@ -124,9 +134,9 @@ async def test_member_user(db_session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def test_viewer_user(db_session: AsyncSession) -> User:
+async def test_viewer_user(db_session: AsyncSession) -> UserModel:
     """Create a third user to be added as project viewer."""
-    user = User(
+    user = UserModel(
         email="viewer@example.com",
         hashed_password=get_password_hash("testpassword123"),
     )
@@ -137,7 +147,7 @@ async def test_viewer_user(db_session: AsyncSession) -> User:
 
 
 @pytest.fixture
-async def auth_headers(client: AsyncClient, test_user: User) -> dict[str, str]:
+async def auth_headers(client: AsyncClient, test_user: UserModel) -> dict[str, str]:
     """Get authentication headers for test user (owner)."""
     response = await client.post(
         "/auth/access-token",
@@ -150,7 +160,7 @@ async def auth_headers(client: AsyncClient, test_user: User) -> dict[str, str]:
 
 @pytest.fixture
 async def member_auth_headers(
-    client: AsyncClient, test_member_user: User
+    client: AsyncClient, test_member_user: UserModel
 ) -> dict[str, str]:
     """Get authentication headers for test member user."""
     response = await client.post(
@@ -164,7 +174,7 @@ async def member_auth_headers(
 
 @pytest.fixture
 async def viewer_auth_headers(
-    client: AsyncClient, test_viewer_user: User
+    client: AsyncClient, test_viewer_user: UserModel
 ) -> dict[str, str]:
     """Get authentication headers for test viewer user."""
     response = await client.post(
@@ -177,9 +187,9 @@ async def viewer_auth_headers(
 
 
 @pytest.fixture
-async def test_project(db_session: AsyncSession, test_user: User) -> Project:
+async def test_project(db_session: AsyncSession, test_user: UserModel) -> ProjectModel:
     """Create a test project with test_user as owner."""
-    project = Project(
+    project = ProjectModel(
         name="Test Project",
         description="A test project",
         key="TEST",
@@ -187,10 +197,10 @@ async def test_project(db_session: AsyncSession, test_user: User) -> Project:
     db_session.add(project)
     await db_session.flush()
 
-    membership = ProjectMember(
+    membership = ProjectMemberModel(
         project_id=project.project_id,
         user_id=test_user.user_id,
-        role=ProjectMemberRole.OWNER,
+        role=ProjectRole.OWNER,
     )
     db_session.add(membership)
     await db_session.commit()
@@ -200,13 +210,15 @@ async def test_project(db_session: AsyncSession, test_user: User) -> Project:
 
 @pytest.fixture
 async def test_project_with_member(
-    db_session: AsyncSession, test_project: Project, test_member_user: User
-) -> Project:
+    db_session: AsyncSession,
+    test_project: ProjectModel,
+    test_member_user: UserModel,
+) -> ProjectModel:
     """Add test_member_user as member to test_project."""
-    membership = ProjectMember(
+    membership = ProjectMemberModel(
         project_id=test_project.project_id,
         user_id=test_member_user.user_id,
-        role=ProjectMemberRole.MEMBER,
+        role=ProjectRole.MEMBER,
     )
     db_session.add(membership)
     await db_session.commit()
@@ -215,13 +227,15 @@ async def test_project_with_member(
 
 @pytest.fixture
 async def test_project_with_viewer(
-    db_session: AsyncSession, test_project: Project, test_viewer_user: User
-) -> Project:
+    db_session: AsyncSession,
+    test_project: ProjectModel,
+    test_viewer_user: UserModel,
+) -> ProjectModel:
     """Add test_viewer_user as viewer to test_project."""
-    membership = ProjectMember(
+    membership = ProjectMemberModel(
         project_id=test_project.project_id,
         user_id=test_viewer_user.user_id,
-        role=ProjectMemberRole.VIEWER,
+        role=ProjectRole.VIEWER,
     )
     db_session.add(membership)
     await db_session.commit()
@@ -230,15 +244,17 @@ async def test_project_with_viewer(
 
 @pytest.fixture
 async def test_issue(
-    db_session: AsyncSession, test_user: User, test_project: Project
-) -> Issue:
+    db_session: AsyncSession,
+    test_user: UserModel,
+    test_project: ProjectModel,
+) -> IssueModel:
     """Create a test issue."""
-    issue = Issue(
+    issue = IssueModel(
         title="Test Issue",
         description="A test issue",
         type=IssueType.TASK,
         status=IssueStatus.TODO,
-        priority=IssuePriority.MEDIUM,
+        priority=Priority.MEDIUM,
         project_id=test_project.project_id,
         reporter_id=test_user.user_id,
     )

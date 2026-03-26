@@ -4,15 +4,14 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from app.api.auth.models import User
-from app.api.issues.models import Issue
-from app.api.issues.schemas import IssueListResponse, IssueResponse
-from app.api.projects.models import Project
+from app.identity.infrastructure.models import UserModel
+from app.issue_tracking.infrastructure.models import IssueModel, ProjectModel
+from app.issue_tracking.infrastructure.schemas import IssueListResponse, IssueResponse
 
 
 @pytest.mark.asyncio
 async def test_create_issue(
-    client: AsyncClient, auth_headers: dict[str, str], test_project: Project
+    client: AsyncClient, auth_headers: dict[str, str], test_project: ProjectModel
 ) -> None:
     """Test creating a new issue."""
     response = await client.post(
@@ -54,7 +53,7 @@ async def test_create_issue_invalid_project(
 
 @pytest.mark.asyncio
 async def test_create_issue_unauthorized(
-    client: AsyncClient, test_project: Project
+    client: AsyncClient, test_project: ProjectModel
 ) -> None:
     """Test creating issue without authentication."""
     response = await client.post(
@@ -72,7 +71,7 @@ async def test_create_issue_unauthorized(
 async def test_create_issue_forbidden_for_viewer(
     client: AsyncClient,
     viewer_auth_headers: dict[str, str],
-    test_project_with_viewer: Project,
+    test_project_with_viewer: ProjectModel,
 ) -> None:
     """Test that viewers cannot create issues."""
     response = await client.post(
@@ -91,8 +90,8 @@ async def test_create_issue_forbidden_for_viewer(
 async def test_create_issue_with_parent(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_project: Project,
-    test_issue: Issue,
+    test_project: ProjectModel,
+    test_issue: IssueModel,
 ) -> None:
     """Test creating issue with parent."""
     response = await client.post(
@@ -114,8 +113,8 @@ async def test_create_issue_with_parent(
 async def test_create_issue_assignee_not_member(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_project: Project,
-    test_member_user: User,
+    test_project: ProjectModel,
+    test_member_user: UserModel,
 ) -> None:
     """Test that assigning a non-member returns 400."""
     response = await client.post(
@@ -135,8 +134,8 @@ async def test_create_issue_assignee_not_member(
 async def test_create_issue_assignee_is_member(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_project_with_member: Project,
-    test_member_user: User,
+    test_project_with_member: ProjectModel,
+    test_member_user: UserModel,
 ) -> None:
     """Test assigning an issue to a valid project member."""
     response = await client.post(
@@ -156,7 +155,7 @@ async def test_create_issue_assignee_is_member(
 
 @pytest.mark.asyncio
 async def test_list_issues(
-    client: AsyncClient, auth_headers: dict[str, str], test_issue: Issue
+    client: AsyncClient, auth_headers: dict[str, str], test_issue: IssueModel
 ) -> None:
     """Test listing issues."""
     response = await client.get("/issues", headers=auth_headers)
@@ -170,8 +169,8 @@ async def test_list_issues(
 async def test_list_issues_filtered_by_project(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_project: Project,
-    test_issue: Issue,  # noqa: ARG001
+    test_project: ProjectModel,
+    test_issue: IssueModel,  # noqa: ARG001
 ) -> None:
     """Test listing issues filtered by project."""
     response = await client.get(
@@ -191,7 +190,7 @@ async def test_list_issues_unauthorized(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_get_issue(
-    client: AsyncClient, auth_headers: dict[str, str], test_issue: Issue
+    client: AsyncClient, auth_headers: dict[str, str], test_issue: IssueModel
 ) -> None:
     """Test getting a specific issue."""
     response = await client.get(f"/issues/{test_issue.issue_id}", headers=auth_headers)
@@ -214,7 +213,7 @@ async def test_get_issue_not_found(
 
 @pytest.mark.asyncio
 async def test_update_issue(
-    client: AsyncClient, auth_headers: dict[str, str], test_issue: Issue
+    client: AsyncClient, auth_headers: dict[str, str], test_issue: IssueModel
 ) -> None:
     """Test updating an issue."""
     response = await client.patch(
@@ -232,8 +231,8 @@ async def test_update_issue(
 async def test_update_issue_assignee_not_member(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_issue: Issue,
-    test_member_user: User,
+    test_issue: IssueModel,
+    test_member_user: UserModel,
 ) -> None:
     """Test updating issue with assignee who is not a project member returns 400."""
     response = await client.patch(
@@ -259,7 +258,7 @@ async def test_update_issue_not_found(
 
 @pytest.mark.asyncio
 async def test_delete_issue(
-    client: AsyncClient, auth_headers: dict[str, str], test_issue: Issue
+    client: AsyncClient, auth_headers: dict[str, str], test_issue: IssueModel
 ) -> None:
     """Test deleting an issue."""
     response = await client.delete(

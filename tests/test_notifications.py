@@ -5,22 +5,21 @@ from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth.models import User
-from app.api.issues.models import Issue
-from app.api.notifications.models import Notification
-from app.api.notifications.schemas import (
+from app.identity.infrastructure.models import UserModel
+from app.issue_tracking.infrastructure.models import IssueModel, ProjectModel
+from app.notifications.infrastructure.models import NotificationModel
+from app.notifications.infrastructure.schemas import (
     NotificationListResponse,
     NotificationResponse,
 )
-from app.api.projects.models import Project
 
 
 @pytest.fixture
 async def test_notification(
-    db_session: AsyncSession, test_user: User, test_issue: Issue
-) -> Notification:
+    db_session: AsyncSession, test_user: UserModel, test_issue: IssueModel
+) -> NotificationModel:
     """Create a test notification."""
-    notification = Notification(
+    notification = NotificationModel(
         user_id=test_user.user_id,
         issue_id=test_issue.issue_id,
         message="You were assigned to: Test Issue",
@@ -35,7 +34,7 @@ async def test_notification(
 async def test_list_notifications(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_notification: Notification,
+    test_notification: NotificationModel,
 ) -> None:
     """Test listing notifications for current user."""
     response = await client.get("/notifications", headers=auth_headers)
@@ -52,7 +51,7 @@ async def test_list_notifications(
 async def test_list_notifications_filter_unread(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_notification: Notification,  # noqa: ARG001
+    test_notification: NotificationModel,  # noqa: ARG001
 ) -> None:
     """Test listing only unread notifications."""
     response = await client.get("/notifications?is_read=false", headers=auth_headers)
@@ -72,7 +71,7 @@ async def test_list_notifications_unauthorized(client: AsyncClient) -> None:
 async def test_mark_notification_read(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_notification: Notification,
+    test_notification: NotificationModel,
 ) -> None:
     """Test marking a notification as read."""
     response = await client.patch(
@@ -100,7 +99,7 @@ async def test_mark_notification_read_not_found(
 async def test_mark_notification_read_forbidden(
     client: AsyncClient,
     member_auth_headers: dict[str, str],
-    test_notification: Notification,
+    test_notification: NotificationModel,
 ) -> None:
     """Test that another user cannot mark someone else's notification as read."""
     response = await client.patch(
@@ -114,9 +113,9 @@ async def test_mark_notification_read_forbidden(
 async def test_assign_issue_creates_notification(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_project_with_member: Project,  # noqa: ARG001
-    test_member_user: User,
-    test_issue: Issue,
+    test_project_with_member: ProjectModel,  # noqa: ARG001
+    test_member_user: UserModel,
+    test_issue: IssueModel,
 ) -> None:
     """Test that assigning an issue creates a notification for the assignee."""
     # Assign the issue to member user
@@ -150,9 +149,9 @@ async def test_assign_issue_no_notification_when_same_assignee(
     client: AsyncClient,
     auth_headers: dict[str, str],
     member_auth_headers: dict[str, str],
-    test_project_with_member: Project,  # noqa: ARG001
-    test_member_user: User,
-    test_issue: Issue,
+    test_project_with_member: ProjectModel,  # noqa: ARG001
+    test_member_user: UserModel,
+    test_issue: IssueModel,
 ) -> None:
     """Test that re-assigning to the same user does not create duplicate notification."""
     # First assignment

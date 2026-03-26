@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.notifications.services import (
+from app.notifications.application.dispatcher import (
     EmailNotificationService,
     EmailSender,
     InAppNotificationService,
