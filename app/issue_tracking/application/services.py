@@ -9,9 +9,6 @@ from __future__ import annotations
 import logging
 import uuid
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.event_bus import EventBus
 from app.issue_tracking.domain.entities import Comment, Issue, Project
 from app.issue_tracking.domain.exceptions import (
@@ -19,18 +16,16 @@ from app.issue_tracking.domain.exceptions import (
     InsufficientPermissions,
     IssueNotFound,
 )
+from app.issue_tracking.domain.repositories import (
+    CommentRepository,
+    IssueRepository,
+    ProjectRepository,
+)
 from app.issue_tracking.domain.value_objects import (
     IssueStatus,
     IssueType,
     Priority,
     ProjectRole,
-)
-from app.issue_tracking.infrastructure.models import (
-    CommentModel,
-)
-from app.issue_tracking.infrastructure.repositories import (
-    PostgresIssueRepository,
-    PostgresProjectRepository,
 )
 from app.shared.domain.identifiers import (
     CommentId,
@@ -38,6 +33,7 @@ from app.shared.domain.identifiers import (
     ProjectId,
     UserId,
 )
+from app.shared.domain.unit_of_work import UnitOfWork
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +42,22 @@ class ProjectAppService:
     """Application service for project management.
 
     Handles project CRUD and membership operations.
-    Delegates persistence to PostgresProjectRepository.
+    Delegates persistence to abstract ProjectRepository.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize with database session."""
-        self._session = session
-        self._repo = PostgresProjectRepository(session)
+    def __init__(
+        self,
+        project_repo: ProjectRepository,
+        uow: UnitOfWork,
+    ) -> None:
+        """Initialize with repository and unit of work.
+
+        Args:
+            project_repo: Abstract project repository.
+            uow: Unit of work for transaction management.
+        """
+        self._repo = project_repo
+        self._uow = uow
 
     async def create_project(
         self,
@@ -80,7 +85,7 @@ class ProjectAppService:
         )
         project.add_member(UserId(owner_id), ProjectRole.OWNER)
         saved = await self._repo.save(project)
-        await self._session.commit()
+        await self._uow.commit()
         return saved
 
     async def add_member(
@@ -102,7 +107,7 @@ class ProjectAppService:
             raise InsufficientPermissions("Only owners can add members")
         project.add_member(UserId(target_user_id), role)
         await self._repo.save(project)
-        await self._session.commit()
+        await self._uow.commit()
 
     async def remove_member(
         self, project_id: str, requesting_user_id: str, target_user_id: str
@@ -116,7 +121,7 @@ class ProjectAppService:
             m for m in project.members if m.user_id != UserId(target_user_id)
         ]
         await self._repo.save(project)
-        await self._session.commit()
+        await self._uow.commit()
 
     async def delete_project(self, project_id: str, requesting_user_id: str) -> None:
         """Delete a project. Requester must be OWNER."""
@@ -125,7 +130,7 @@ class ProjectAppService:
         if not member or member.role != ProjectRole.OWNER:
             raise InsufficientPermissions("Only owners can delete a project")
         await self._repo.delete(ProjectId(project_id))
-        await self._session.commit()
+        await self._uow.commit()
 
 
 class IssueAppService:
@@ -136,17 +141,28 @@ class IssueAppService:
     - Decouples issue_tracking from notifications context.
     """
 
-    def __init__(self, session: AsyncSession, event_bus: EventBus) -> None:
-        """Initialize with session and event bus.
+    def __init__(
+        self,
+        issue_repo: IssueRepository,
+        project_repo: ProjectRepository,
+        comment_repo: CommentRepository,
+        uow: UnitOfWork,
+        event_bus: EventBus,
+    ) -> None:
+        """Initialize with repositories, unit of work, and event bus.
 
         Args:
-            session: Database session (shared with event bus handlers).
+            issue_repo: Abstract issue repository.
+            project_repo: Abstract project repository.
+            comment_repo: Abstract comment repository.
+            uow: Unit of work for transaction management.
             event_bus: Request-scoped event bus with notification handler subscribed.
         """
-        self._session = session
+        self._issue_repo = issue_repo
+        self._project_repo = project_repo
+        self._comment_repo = comment_repo
+        self._uow = uow
         self._event_bus = event_bus
-        self._issue_repo = PostgresIssueRepository(session)
-        self._project_repo = PostgresProjectRepository(session)
 
     async def create_issue(
         self,
@@ -206,7 +222,7 @@ class IssueAppService:
             parent_id=IssueId(parent_id) if parent_id else None,
         )
         saved = await self._issue_repo.save(issue)
-        await self._session.commit()
+        await self._uow.commit()
         return saved
 
     async def update_issue(
@@ -269,7 +285,7 @@ class IssueAppService:
         for event in issue.pull_events():
             await self._event_bus.publish(event)
 
-        await self._session.commit()
+        await self._uow.commit()
         return saved
 
     async def delete_issue(self, issue_id: str, requesting_user_id: str) -> None:
@@ -284,14 +300,10 @@ class IssueAppService:
             raise InsufficientPermissions("Viewers cannot delete issues")
 
         await self._issue_repo.delete(IssueId(issue_id))
-        await self._session.commit()
+        await self._uow.commit()
 
     async def create_comment(self, issue_id: str, author_id: str, body: str) -> Comment:
         """Add a comment to an issue.
-
-        Loads the issue, adds comment via domain entity, persists via ORM directly
-        (Comment is part of Issue aggregate but we avoid loading all comments
-        for performance).
 
         Returns:
             Created Comment entity.
@@ -302,23 +314,15 @@ class IssueAppService:
         if not project.get_member(UserId(author_id)):
             raise IssueNotFound(issue_id)
 
-        comment_id = str(uuid.uuid4())
-        comment_model = CommentModel(
-            comment_id=comment_id,
-            issue_id=issue_id,
-            author_id=author_id,
+        comment = Comment(
+            comment_id=CommentId(str(uuid.uuid4())),
+            issue_id=IssueId(issue_id),
+            author_id=UserId(author_id),
             body=body,
         )
-        self._session.add(comment_model)
-        await self._session.commit()
-        await self._session.refresh(comment_model)
-        return Comment(
-            comment_id=CommentId(comment_model.comment_id),
-            issue_id=IssueId(comment_model.issue_id),
-            author_id=UserId(comment_model.author_id),
-            body=comment_model.body,
-            created_at=comment_model.created_at,
-        )
+        saved = await self._comment_repo.save(comment)
+        await self._uow.commit()
+        return saved
 
     async def list_comments(
         self, issue_id: str, requesting_user_id: str
@@ -337,18 +341,4 @@ class IssueAppService:
         if not project.get_member(UserId(requesting_user_id)):
             raise IssueNotFound(issue_id)
 
-        result = await self._session.execute(
-            select(CommentModel)
-            .where(CommentModel.issue_id == issue_id)
-            .order_by(CommentModel.created_at)
-        )
-        return [
-            Comment(
-                comment_id=CommentId(m.comment_id),
-                issue_id=IssueId(m.issue_id),
-                author_id=UserId(m.author_id),
-                body=m.body,
-                created_at=m.created_at,
-            )
-            for m in result.scalars().all()
-        ]
+        return await self._comment_repo.list_for_issue(IssueId(issue_id))

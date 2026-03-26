@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from app.issue_tracking.domain.entities import Issue, Project
+from app.issue_tracking.domain.entities import Comment, Issue, Project
 
 
 class ProjectRepository(ABC):
@@ -41,3 +41,29 @@ class IssueRepository(ABC):
     @abstractmethod
     async def delete(self, issue_id: object) -> None:
         """Delete issue by ID."""
+
+
+class CommentRepository(ABC):
+    """Abstract repository for Comment entity (part of Issue aggregate)."""
+
+    @abstractmethod
+    async def save(self, comment: Comment) -> Comment:
+        """Persist a new comment.
+
+        Args:
+            comment: The Comment domain entity.
+
+        Returns:
+            The saved Comment with DB-assigned fields populated.
+        """
+
+    @abstractmethod
+    async def list_for_issue(self, issue_id: object) -> list[Comment]:
+        """List all comments for an issue, ordered by creation time.
+
+        Args:
+            issue_id: The issue identifier.
+
+        Returns:
+            List of Comment entities.
+        """

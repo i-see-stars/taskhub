@@ -1,18 +1,18 @@
-"""Notification dispatcher — application service using Factory Method pattern.
+"""Notification dispatcher — application-layer abstractions and re-exports.
 
-Copied from app/api/notifications/services.py with import paths updated.
-The Factory Method pattern (NotificationService → InAppNotificationService,
-EmailNotificationService) is preserved.
+Abstract base classes (NotificationSender, NotificationService) and data carriers
+(NotificationContext, NotificationResult) live here in the application layer.
+
+Concrete implementations (InAppSender, EmailSender, etc.) live in the
+infrastructure layer (senders.py) and are re-exported here for backward
+compatibility.
 """
+
+from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.notifications.infrastructure.connection_manager import ConnectionManager
-from app.notifications.infrastructure.models import NotificationModel
 
 logger = logging.getLogger(__name__)
 
@@ -59,84 +59,6 @@ class NotificationSender(ABC):
         """
 
 
-class InAppSender(NotificationSender):
-    """Concrete product — saves notification to DB and pushes via WebSocket."""
-
-    def __init__(
-        self, session: AsyncSession, connection_manager: ConnectionManager
-    ) -> None:
-        """Initialize with database session and connection manager.
-
-        Args:
-            session: The async database session.
-            connection_manager: The WebSocket connection manager.
-        """
-        self.session = session
-        self.connection_manager = connection_manager
-
-    def channel_name(self) -> str:
-        """Return channel name.
-
-        Returns:
-            The string 'in_app'.
-        """
-        return "in_app"
-
-    async def send(self, context: NotificationContext) -> None:
-        """Save notification to DB and push via WebSocket if user is online.
-
-        Args:
-            context: The notification data.
-        """
-        notification = NotificationModel(
-            user_id=context.recipient_id,
-            issue_id=context.issue_id,
-            message=context.message,
-        )
-        self.session.add(notification)
-        await self.session.flush()
-        await self.session.refresh(notification)
-
-        created_at = (
-            notification.created_at.isoformat()
-            if notification.created_at is not None
-            else None
-        )
-        await self.connection_manager.send(
-            context.recipient_id,
-            {
-                "notification_id": notification.notification_id,
-                "issue_id": context.issue_id,
-                "message": context.message,
-                "created_at": created_at,
-            },
-        )
-
-
-class EmailSender(NotificationSender):
-    """Concrete product — mock email sender (logs instead of sending)."""
-
-    def channel_name(self) -> str:
-        """Return channel name.
-
-        Returns:
-            The string 'email'.
-        """
-        return "email"
-
-    async def send(self, context: NotificationContext) -> None:
-        """Log email notification (mock implementation).
-
-        Args:
-            context: The notification data.
-        """
-        logger.info(
-            "Email notification (mock): recipient=%s, message=%s",
-            context.recipient_id,
-            context.message,
-        )
-
-
 # === Creator hierarchy ===
 
 
@@ -179,91 +101,24 @@ class NotificationService(ABC):
         )
 
 
-class InAppNotificationService(NotificationService):
-    """Concrete creator — creates InAppSender."""
+# Re-export concrete implementations from infrastructure for backward compatibility.
+# This allows existing code to import from this module without changes.
+from app.notifications.infrastructure.senders import (  # noqa: E402
+    EmailNotificationService,
+    EmailSender,
+    InAppNotificationService,
+    InAppSender,
+    NotificationDispatcher,
+)
 
-    def __init__(
-        self, session: AsyncSession, connection_manager: ConnectionManager
-    ) -> None:
-        """Initialize with dependencies for InAppSender.
-
-        Args:
-            session: The async database session.
-            connection_manager: The WebSocket connection manager.
-        """
-        self.session = session
-        self.connection_manager = connection_manager
-
-    def create_sender(self) -> NotificationSender:
-        """Create an in-app notification sender.
-
-        Returns:
-            InAppSender with session and connection manager.
-        """
-        return InAppSender(
-            session=self.session, connection_manager=self.connection_manager
-        )
-
-
-class EmailNotificationService(NotificationService):
-    """Concrete creator — creates EmailSender."""
-
-    def create_sender(self) -> NotificationSender:
-        """Create a mock email notification sender.
-
-        Returns:
-            EmailSender instance.
-        """
-        return EmailSender()
-
-
-# === Dispatcher ===
-
-
-class NotificationDispatcher:
-    """Dispatches notifications to all enabled channels for a user."""
-
-    def __init__(
-        self, session: AsyncSession, connection_manager: ConnectionManager
-    ) -> None:
-        """Initialize with shared dependencies.
-
-        Args:
-            session: The async database session.
-            connection_manager: The WebSocket connection manager.
-        """
-        self.session = session
-        self.connection_manager = connection_manager
-
-    async def dispatch(
-        self,
-        context: NotificationContext,
-        notify_in_app: bool,
-        notify_email: bool,
-    ) -> list[NotificationResult]:
-        """Send notification via all enabled channels.
-
-        Args:
-            context: The notification data.
-            notify_in_app: Whether in-app channel is enabled.
-            notify_email: Whether email channel is enabled.
-
-        Returns:
-            List of results, one per channel attempted.
-        """
-        services: list[NotificationService] = []
-        if notify_in_app:
-            services.append(
-                InAppNotificationService(
-                    session=self.session,
-                    connection_manager=self.connection_manager,
-                )
-            )
-        if notify_email:
-            services.append(EmailNotificationService())
-
-        results: list[NotificationResult] = []
-        for service in services:
-            result = await service.notify(context)
-            results.append(result)
-        return results
+__all__ = [
+    "EmailNotificationService",
+    "EmailSender",
+    "InAppNotificationService",
+    "InAppSender",
+    "NotificationContext",
+    "NotificationDispatcher",
+    "NotificationResult",
+    "NotificationSender",
+    "NotificationService",
+]

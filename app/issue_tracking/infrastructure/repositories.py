@@ -7,12 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.issue_tracking.domain.entities import (
+    Comment,
     Issue,
     Project,
     ProjectMember,
 )
 from app.issue_tracking.domain.exceptions import IssueNotFound, ProjectNotFound
-from app.issue_tracking.domain.repositories import IssueRepository, ProjectRepository
+from app.issue_tracking.domain.repositories import (
+    CommentRepository,
+    IssueRepository,
+    ProjectRepository,
+)
 from app.issue_tracking.domain.value_objects import (
     IssueStatus,
     IssueType,
@@ -20,11 +25,13 @@ from app.issue_tracking.domain.value_objects import (
     ProjectRole,
 )
 from app.issue_tracking.infrastructure.models import (
+    CommentModel,
     IssueModel,
     ProjectMemberModel,
     ProjectModel,
 )
 from app.shared.domain.identifiers import (
+    CommentId,
     IssueId,
     ProjectId,
     UserId,
@@ -256,3 +263,67 @@ class PostgresIssueRepository(IssueRepository):
         model = result.scalar_one_or_none()
         if model:
             await self.session.delete(model)
+
+
+class PostgresCommentRepository(CommentRepository):
+    """Comment repository backed by PostgreSQL."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with database session.
+
+        Args:
+            session: The async database session.
+        """
+        self.session = session
+
+    async def save(self, comment: Comment) -> Comment:
+        """Persist a new comment.
+
+        Args:
+            comment: The Comment domain entity.
+
+        Returns:
+            The saved Comment with DB-assigned fields populated.
+        """
+        model = CommentModel(
+            comment_id=comment.comment_id.value,
+            issue_id=comment.issue_id.value,
+            author_id=comment.author_id.value,
+            body=comment.body,
+        )
+        self.session.add(model)
+        await self.session.flush()
+        await self.session.refresh(model)
+        return Comment(
+            comment_id=CommentId(model.comment_id),
+            issue_id=IssueId(model.issue_id),
+            author_id=UserId(model.author_id),
+            body=model.body,
+            created_at=model.created_at,
+        )
+
+    async def list_for_issue(self, issue_id: object) -> list[Comment]:
+        """List all comments for an issue, ordered by creation time.
+
+        Args:
+            issue_id: The issue identifier.
+
+        Returns:
+            List of Comment entities.
+        """
+        iid = issue_id if isinstance(issue_id, IssueId) else IssueId(str(issue_id))
+        result = await self.session.execute(
+            select(CommentModel)
+            .where(CommentModel.issue_id == iid.value)
+            .order_by(CommentModel.created_at)
+        )
+        return [
+            Comment(
+                comment_id=CommentId(m.comment_id),
+                issue_id=IssueId(m.issue_id),
+                author_id=UserId(m.author_id),
+                body=m.body,
+                created_at=m.created_at,
+            )
+            for m in result.scalars().all()
+        ]

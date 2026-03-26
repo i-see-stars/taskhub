@@ -23,6 +23,7 @@ from app.identity.domain.exceptions import (
     TokenNotFound,
 )
 from app.identity.infrastructure import api_messages
+from app.identity.infrastructure.adapters import BcryptPasswordHasher, JWTTokenService
 from app.identity.infrastructure.deps import get_current_user
 from app.identity.infrastructure.models import UserModel
 from app.identity.infrastructure.repositories import (
@@ -37,8 +38,12 @@ from app.identity.infrastructure.schemas import (
     UserUpdatePasswordRequest,
 )
 from app.shared.domain.identifiers import UserId
+from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 router = APIRouter(responses=api_messages.UNAUTHORIZED_RESPONSES)
+
+_password_hasher = BcryptPasswordHasher()
+_token_service = JWTTokenService()
 
 
 @router.get("/me", response_model=UserResponse, description="Get current user")
@@ -61,7 +66,7 @@ async def delete_current_user(
     """Delete the current user's account."""
     use_case = DeleteAccountUseCase(
         user_repo=PostgresUserRepository(session),
-        session=session,
+        uow=SqlAlchemyUnitOfWork(session),
     )
     await use_case.execute(UserId(current_user.user_id))
 
@@ -79,7 +84,8 @@ async def reset_current_user_password(
     """Update the current user's password."""
     use_case = ChangePasswordUseCase(
         user_repo=PostgresUserRepository(session),
-        session=session,
+        uow=SqlAlchemyUnitOfWork(session),
+        password_hasher=_password_hasher,
     )
     await use_case.execute(UserId(current_user.user_id), user_update_password.password)
 
@@ -98,10 +104,12 @@ async def login_access_token(
     use_case = AuthenticateUseCase(
         user_repo=PostgresUserRepository(session),
         token_repo=PostgresRefreshTokenRepository(session),
-        session=session,
+        uow=SqlAlchemyUnitOfWork(session),
+        password_hasher=_password_hasher,
+        token_service=_token_service,
     )
     try:
-        jwt_token, refresh_token_str, refresh_exp = await use_case.execute(
+        access_token, refresh_token_str, refresh_exp = await use_case.execute(
             email=form_data.username,
             password=form_data.password,
         )
@@ -111,8 +119,8 @@ async def login_access_token(
             detail=api_messages.PASSWORD_INVALID,
         ) from None
     return AccessTokenResponse(
-        access_token=jwt_token.access_token,
-        expires_at=jwt_token.payload.exp,
+        access_token=access_token.token,
+        expires_at=access_token.expires_at,
         refresh_token=refresh_token_str,
         refresh_token_expires_at=refresh_exp,
     )
@@ -131,10 +139,11 @@ async def refresh_token(
     """Refresh an access token using a refresh token."""
     use_case = RefreshTokenUseCase(
         token_repo=PostgresRefreshTokenRepository(session),
-        session=session,
+        uow=SqlAlchemyUnitOfWork(session),
+        token_service=_token_service,
     )
     try:
-        jwt_token, new_refresh_str, refresh_exp = await use_case.execute(
+        access_token, new_refresh_str, refresh_exp = await use_case.execute(
             data.refresh_token
         )
     except TokenNotFound:
@@ -153,8 +162,8 @@ async def refresh_token(
             detail=api_messages.REFRESH_TOKEN_ALREADY_USED,
         ) from None
     return AccessTokenResponse(
-        access_token=jwt_token.access_token,
-        expires_at=jwt_token.payload.exp,
+        access_token=access_token.token,
+        expires_at=access_token.expires_at,
         refresh_token=new_refresh_str,
         refresh_token_expires_at=refresh_exp,
     )
@@ -173,7 +182,8 @@ async def register_new_user(
     """Register a new user account."""
     use_case = RegisterUseCase(
         user_repo=PostgresUserRepository(session),
-        session=session,
+        uow=SqlAlchemyUnitOfWork(session),
+        password_hasher=_password_hasher,
     )
     try:
         user_entity = await use_case.execute(
