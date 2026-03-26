@@ -76,6 +76,7 @@ class RegisterUseCase:
         )
         saved = await self._user_repo.save(user)
         await self._uow.commit()
+        # TODO: emit UserRegistered event via event bus
         return saved
 
 
@@ -248,6 +249,7 @@ class ChangePasswordUseCase:
         )
         await self._user_repo.save(updated)
         await self._uow.commit()
+        # TODO: emit PasswordChanged event via event bus
 
 
 class DeleteAccountUseCase:
