@@ -4,8 +4,8 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from app.api.auth.models import User
-from app.api.auth.schemas import AccessTokenResponse, UserResponse
+from app.identity.infrastructure.models import UserModel
+from app.identity.infrastructure.schemas import AccessTokenResponse, UserResponse
 
 
 @pytest.mark.asyncio
@@ -23,7 +23,9 @@ async def test_register_success(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_register_duplicate_email(client: AsyncClient, test_user: User) -> None:
+async def test_register_duplicate_email(
+    client: AsyncClient, test_user: UserModel
+) -> None:
     """Test registration with duplicate email."""
     response = await client.post(
         "/auth/register",
@@ -33,7 +35,7 @@ async def test_register_duplicate_email(client: AsyncClient, test_user: User) ->
 
 
 @pytest.mark.asyncio
-async def test_login_success(client: AsyncClient, test_user: User) -> None:
+async def test_login_success(client: AsyncClient, test_user: UserModel) -> None:
     """Test successful login."""
     response = await client.post(
         "/auth/access-token",
@@ -47,7 +49,7 @@ async def test_login_success(client: AsyncClient, test_user: User) -> None:
 
 
 @pytest.mark.asyncio
-async def test_login_wrong_password(client: AsyncClient, test_user: User) -> None:
+async def test_login_wrong_password(client: AsyncClient, test_user: UserModel) -> None:
     """Test login with wrong password."""
     response = await client.post(
         "/auth/access-token",
@@ -68,7 +70,7 @@ async def test_login_nonexistent_user(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_get_current_user(
-    client: AsyncClient, auth_headers: dict[str, str], test_user: User
+    client: AsyncClient, auth_headers: dict[str, str], test_user: UserModel
 ) -> None:
     """Test getting current user info."""
     response = await client.get("/auth/me", headers=auth_headers)
@@ -86,7 +88,7 @@ async def test_get_current_user_unauthorized(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_refresh_token(client: AsyncClient, test_user: User) -> None:
+async def test_refresh_token(client: AsyncClient, test_user: UserModel) -> None:
     """Test token refresh."""
     # First login
     login_response = await client.post(

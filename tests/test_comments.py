@@ -4,16 +4,18 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
-from app.api.comments.schemas import CommentListResponse, CommentResponse
-from app.api.issues.models import Issue
-from app.api.projects.models import Project
+from app.issue_tracking.infrastructure.models import IssueModel, ProjectModel
+from app.issue_tracking.infrastructure.schemas import (
+    CommentListResponse,
+    CommentResponse,
+)
 
 
 @pytest.mark.asyncio
 async def test_create_comment(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_issue: Issue,
+    test_issue: IssueModel,
 ) -> None:
     """Test creating a comment on an issue."""
     response = await client.post(
@@ -30,7 +32,7 @@ async def test_create_comment(
 
 @pytest.mark.asyncio
 async def test_create_comment_unauthorized(
-    client: AsyncClient, test_issue: Issue
+    client: AsyncClient, test_issue: IssueModel
 ) -> None:
     """Test creating comment without authentication."""
     response = await client.post(
@@ -44,7 +46,7 @@ async def test_create_comment_unauthorized(
 async def test_create_comment_forbidden_for_non_member(
     client: AsyncClient,
     member_auth_headers: dict[str, str],
-    test_issue: Issue,
+    test_issue: IssueModel,
 ) -> None:
     """Test that non-members cannot comment on issues."""
     response = await client.post(
@@ -59,8 +61,8 @@ async def test_create_comment_forbidden_for_non_member(
 async def test_create_comment_forbidden_for_viewer(
     client: AsyncClient,
     viewer_auth_headers: dict[str, str],
-    test_project_with_viewer: Project,  # noqa: ARG001
-    test_issue: Issue,
+    test_project_with_viewer: ProjectModel,  # noqa: ARG001
+    test_issue: IssueModel,
 ) -> None:
     """Test that viewers cannot create comments."""
     response = await client.post(
@@ -75,7 +77,7 @@ async def test_create_comment_forbidden_for_viewer(
 async def test_list_comments(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_issue: Issue,
+    test_issue: IssueModel,
 ) -> None:
     """Test listing comments on an issue."""
     # Create a comment first
@@ -99,8 +101,8 @@ async def test_list_comments(
 async def test_list_comments_as_member(
     client: AsyncClient,
     member_auth_headers: dict[str, str],
-    test_project_with_member: Project,  # noqa: ARG001
-    test_issue: Issue,
+    test_project_with_member: ProjectModel,  # noqa: ARG001
+    test_issue: IssueModel,
 ) -> None:
     """Test that project members can list comments."""
     response = await client.get(
@@ -114,7 +116,7 @@ async def test_list_comments_as_member(
 async def test_delete_comment_by_author(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_issue: Issue,
+    test_issue: IssueModel,
 ) -> None:
     """Test that comment author can delete their own comment."""
     create_response = await client.post(
@@ -137,8 +139,8 @@ async def test_delete_comment_by_non_author_forbidden(
     client: AsyncClient,
     auth_headers: dict[str, str],
     member_auth_headers: dict[str, str],
-    test_project_with_member: Project,  # noqa: ARG001
-    test_issue: Issue,
+    test_project_with_member: ProjectModel,  # noqa: ARG001
+    test_issue: IssueModel,
 ) -> None:
     """Test that a non-author member cannot delete another user's comment."""
     # Owner creates the comment
@@ -162,7 +164,7 @@ async def test_delete_comment_by_non_author_forbidden(
 async def test_delete_comment_not_found(
     client: AsyncClient,
     auth_headers: dict[str, str],
-    test_issue: Issue,
+    test_issue: IssueModel,
 ) -> None:
     """Test deleting non-existent comment."""
     response = await client.delete(

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.notifications.connection_manager import ConnectionManager
+from app.notifications.infrastructure.connection_manager import ConnectionManager
 
 
 @pytest.mark.asyncio

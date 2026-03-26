@@ -4,10 +4,10 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from app.api.auth.jwt import create_jwt_token
-from app.api.main import app
-from app.api.notifications.connection_manager import ConnectionManager
-from app.api.notifications.deps import get_connection_manager
+from app.identity.infrastructure.jwt import create_jwt_token
+from app.main import app
+from app.notifications.infrastructure.connection_manager import ConnectionManager
+from app.notifications.infrastructure.deps import get_connection_manager
 
 
 def test_websocket_connect_with_valid_token() -> None:
