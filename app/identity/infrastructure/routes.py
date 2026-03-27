@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+# Use case types imported for Depends() type annotations — infrastructure depends on application, which is correct.
 from app.identity.application.use_cases import (
     AuthenticateUseCase,
     ChangePasswordUseCase,

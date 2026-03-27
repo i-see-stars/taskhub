@@ -35,7 +35,7 @@ _token_service = JWTTokenService()
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserModel:
     """Get the current authenticated user from the JWT token.
 
