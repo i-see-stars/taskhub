@@ -6,6 +6,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.issue_tracking.application.issue_use_cases import (
+    CreateCommentUseCase,
+    DeleteCommentUseCase,
+    DeleteIssueUseCase,
+)
 from app.issue_tracking.application.project_use_cases import (
     AddProjectMemberUseCase,
     CreateProjectUseCase,
@@ -14,16 +19,23 @@ from app.issue_tracking.application.project_use_cases import (
     UpdateMemberRoleUseCase,
     UpdateProjectUseCase,
 )
-from app.issue_tracking.domain.entities import Project
+from app.issue_tracking.domain.entities import Comment, Issue, Project
 from app.issue_tracking.domain.exceptions import (
+    CommentDeleteNotPermitted,
+    CommentNotFound,
     DuplicateProjectKey,
     InsufficientPermissions,
     LastOwnerCannotBeRemoved,
     MemberNotFound,
     UserAlreadyProjectMember,
 )
-from app.issue_tracking.domain.value_objects import ProjectRole
-from app.shared.domain.identifiers import ProjectId, UserId
+from app.issue_tracking.domain.value_objects import (
+    IssueStatus,
+    IssueType,
+    Priority,
+    ProjectRole,
+)
+from app.shared.domain.identifiers import CommentId, IssueId, ProjectId, UserId
 
 
 def _make_project(
@@ -71,6 +83,37 @@ def _make_repo(
     repo.key_exists.return_value = key_exists
     repo.save.side_effect = lambda p: p
     return repo
+
+
+def _make_issue(
+    project_id: str = "proj-1",
+    reporter_id: str = "user-1",
+    comments: list[Comment] | None = None,
+) -> Issue:
+    """Create a test issue.
+
+    Args:
+        project_id: The issue's project ID.
+        reporter_id: The reporter's user ID.
+        comments: Optional list of comments.
+
+    Returns:
+        An Issue aggregate.
+    """
+    issue = Issue(
+        issue_id=IssueId("issue-1"),
+        project_id=ProjectId(project_id),
+        type=IssueType.TASK,
+        title="Test issue",
+        description=None,
+        status=IssueStatus.TODO,
+        priority=Priority.MEDIUM,
+        reporter_id=UserId(reporter_id),
+        assignee_id=None,
+        parent_id=None,
+    )
+    issue.comments = comments or []
+    return issue
 
 
 @pytest.mark.asyncio
@@ -177,3 +220,93 @@ async def test_update_role_not_found_raises() -> None:
     uc = UpdateMemberRoleUseCase(project_repo=repo, unit_of_work=AsyncMock())
     with pytest.raises(MemberNotFound):
         await uc.execute("proj-1", "owner-1", "stranger", ProjectRole.MEMBER)
+
+
+@pytest.mark.asyncio
+async def test_delete_issue_viewer_raises() -> None:
+    """Test that viewers cannot delete issues."""
+    project = _make_project(
+        members=[("owner-1", ProjectRole.OWNER), ("viewer-1", ProjectRole.VIEWER)]
+    )
+    issue = _make_issue(project_id="proj-1")
+    issue_repo = AsyncMock()
+    issue_repo.get_by_id.return_value = issue
+    project_repo = AsyncMock()
+    project_repo.get_by_id.return_value = project
+
+    uc = DeleteIssueUseCase(
+        issue_repo=issue_repo,
+        project_repo=project_repo,
+        unit_of_work=AsyncMock(),
+    )
+    with pytest.raises(InsufficientPermissions):
+        await uc.execute("issue-1", "viewer-1")
+
+
+@pytest.mark.asyncio
+async def test_delete_comment_wrong_author_raises() -> None:
+    """Test that non-author non-owner cannot delete a comment."""
+    comment = Comment(
+        comment_id=CommentId("cmt-1"),
+        issue_id=IssueId("issue-1"),
+        author_id=UserId("author-1"),
+        body="Hello",
+        created_at=None,
+    )
+    project = _make_project(
+        members=[("owner-1", ProjectRole.OWNER), ("other-1", ProjectRole.MEMBER)]
+    )
+    issue = _make_issue(comments=[comment])
+    issue_repo = AsyncMock()
+    issue_repo.get_with_comments.return_value = issue
+    project_repo = AsyncMock()
+    project_repo.get_by_id.return_value = project
+
+    uc = DeleteCommentUseCase(
+        issue_repo=issue_repo,
+        project_repo=project_repo,
+        unit_of_work=AsyncMock(),
+    )
+    with pytest.raises(CommentDeleteNotPermitted):
+        await uc.execute("issue-1", "cmt-1", "other-1")
+
+
+@pytest.mark.asyncio
+async def test_delete_comment_not_found_raises() -> None:
+    """Test that deleting a non-existent comment raises CommentNotFound."""
+    project = _make_project(owner_id="owner-1")
+    issue = _make_issue(comments=[])
+    issue_repo = AsyncMock()
+    issue_repo.get_with_comments.return_value = issue
+    project_repo = AsyncMock()
+    project_repo.get_by_id.return_value = project
+
+    uc = DeleteCommentUseCase(
+        issue_repo=issue_repo,
+        project_repo=project_repo,
+        unit_of_work=AsyncMock(),
+    )
+    with pytest.raises(CommentNotFound):
+        await uc.execute("issue-1", "cmt-999", "owner-1")
+
+
+@pytest.mark.asyncio
+async def test_create_comment_viewer_raises() -> None:
+    """Test that viewers cannot add comments."""
+    project = _make_project(
+        members=[("owner-1", ProjectRole.OWNER), ("viewer-1", ProjectRole.VIEWER)]
+    )
+    issue = _make_issue(project_id="proj-1")
+    issue_repo = AsyncMock()
+    issue_repo.get_with_comments.return_value = issue
+    project_repo = AsyncMock()
+    project_repo.get_by_id.return_value = project
+    issue_repo.save.side_effect = lambda i: i
+
+    uc = CreateCommentUseCase(
+        issue_repo=issue_repo,
+        project_repo=project_repo,
+        unit_of_work=AsyncMock(),
+    )
+    with pytest.raises(InsufficientPermissions):
+        await uc.execute("issue-1", "viewer-1", "My comment")
