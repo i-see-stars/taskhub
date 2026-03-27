@@ -26,6 +26,17 @@ class ProjectRepository(ABC):
     async def delete(self, project_id: object) -> None:
         """Delete project by ID."""
 
+    @abstractmethod
+    async def key_exists(self, key: str) -> bool:
+        """Check if a project with this key already exists.
+
+        Args:
+            key: The project key to check.
+
+        Returns:
+            True if a project with this key exists.
+        """
+
 
 class IssueRepository(ABC):
     """Abstract repository for Issue aggregate."""

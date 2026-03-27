@@ -167,6 +167,20 @@ class PostgresProjectRepository(ProjectRepository):
         if model:
             await self.session.delete(model)
 
+    async def key_exists(self, key: str) -> bool:
+        """Check if a project with this key already exists.
+
+        Args:
+            key: The project key to check.
+
+        Returns:
+            True if a project with this key exists.
+        """
+        result = await self.session.execute(
+            select(ProjectModel).where(ProjectModel.key == key)
+        )
+        return result.scalar_one_or_none() is not None
+
 
 class PostgresIssueRepository(IssueRepository):
     """Issue repository backed by PostgreSQL."""
