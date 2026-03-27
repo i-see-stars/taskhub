@@ -34,18 +34,18 @@ class RegisterUseCase:
     def __init__(
         self,
         user_repo: UserRepository,
-        uow: UnitOfWork,
+        unit_of_work: UnitOfWork,
         password_hasher: PasswordHasher,
     ) -> None:
         """Initialize with repositories, unit of work, and password hasher.
 
         Args:
             user_repo: User repository.
-            uow: Unit of work for transaction management.
+            unit_of_work: Unit of work for transaction management.
             password_hasher: Password hashing port.
         """
         self._user_repo = user_repo
-        self._uow = uow
+        self._unit_of_work = unit_of_work
         self._password_hasher = password_hasher
 
     async def execute(self, email: str, password: str) -> User:
@@ -75,7 +75,7 @@ class RegisterUseCase:
             hashed_password=hashed,
         )
         saved = await self._user_repo.save(user)
-        await self._uow.commit()
+        await self._unit_of_work.commit()
         # TODO: emit UserRegistered event via event bus
         return saved
 
@@ -87,7 +87,7 @@ class AuthenticateUseCase:
         self,
         user_repo: UserRepository,
         token_repo: RefreshTokenRepository,
-        uow: UnitOfWork,
+        unit_of_work: UnitOfWork,
         password_hasher: PasswordHasher,
         token_service: TokenService,
     ) -> None:
@@ -96,13 +96,13 @@ class AuthenticateUseCase:
         Args:
             user_repo: User repository.
             token_repo: Refresh token repository.
-            uow: Unit of work for transaction management.
+            unit_of_work: Unit of work for transaction management.
             password_hasher: Password hashing port.
             token_service: Token creation port.
         """
         self._user_repo = user_repo
         self._token_repo = token_repo
-        self._uow = uow
+        self._unit_of_work = unit_of_work
         self._password_hasher = password_hasher
         self._token_service = token_service
 
@@ -141,7 +141,7 @@ class AuthenticateUseCase:
             exp=exp,
         )
         await self._token_repo.save(token_entity)
-        await self._uow.commit()
+        await self._unit_of_work.commit()
         return access_token, refresh_token_str, exp
 
 
@@ -151,18 +151,18 @@ class RefreshTokenUseCase:
     def __init__(
         self,
         token_repo: RefreshTokenRepository,
-        uow: UnitOfWork,
+        unit_of_work: UnitOfWork,
         token_service: TokenService,
     ) -> None:
         """Initialize.
 
         Args:
             token_repo: Refresh token repository.
-            uow: Unit of work for transaction management.
+            unit_of_work: Unit of work for transaction management.
             token_service: Token creation port.
         """
         self._token_repo = token_repo
-        self._uow = uow
+        self._unit_of_work = unit_of_work
         self._token_service = token_service
 
     async def execute(self, refresh_token: str) -> tuple[AccessToken, str, int]:
@@ -209,7 +209,7 @@ class RefreshTokenUseCase:
             exp=exp,
         )
         await self._token_repo.save(new_token)
-        await self._uow.commit()
+        await self._unit_of_work.commit()
         return access_token, new_refresh_str, exp
 
 
@@ -219,18 +219,18 @@ class ChangePasswordUseCase:
     def __init__(
         self,
         user_repo: UserRepository,
-        uow: UnitOfWork,
+        unit_of_work: UnitOfWork,
         password_hasher: PasswordHasher,
     ) -> None:
         """Initialize.
 
         Args:
             user_repo: User repository.
-            uow: Unit of work for transaction management.
+            unit_of_work: Unit of work for transaction management.
             password_hasher: Password hashing port.
         """
         self._user_repo = user_repo
-        self._uow = uow
+        self._unit_of_work = unit_of_work
         self._password_hasher = password_hasher
 
     async def execute(self, user_id: UserId, new_password: str) -> None:
@@ -248,22 +248,22 @@ class ChangePasswordUseCase:
             preferences=user.preferences,
         )
         await self._user_repo.save(updated)
-        await self._uow.commit()
+        await self._unit_of_work.commit()
         # TODO: emit PasswordChanged event via event bus
 
 
 class DeleteAccountUseCase:
     """Delete the current user's account."""
 
-    def __init__(self, user_repo: UserRepository, uow: UnitOfWork) -> None:
+    def __init__(self, user_repo: UserRepository, unit_of_work: UnitOfWork) -> None:
         """Initialize.
 
         Args:
             user_repo: User repository.
-            uow: Unit of work for transaction management.
+            unit_of_work: Unit of work for transaction management.
         """
         self._user_repo = user_repo
-        self._uow = uow
+        self._unit_of_work = unit_of_work
 
     async def execute(self, user_id: UserId) -> None:
         """Delete a user account.
@@ -272,4 +272,4 @@ class DeleteAccountUseCase:
             user_id: The user's ID to delete.
         """
         await self._user_repo.delete(user_id)
-        await self._uow.commit()
+        await self._unit_of_work.commit()
