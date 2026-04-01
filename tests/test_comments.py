@@ -48,13 +48,16 @@ async def test_create_comment_forbidden_for_non_member(
     member_auth_headers: dict[str, str],
     test_issue: IssueModel,
 ) -> None:
-    """Test that non-members cannot comment on issues."""
+    """Test that non-members cannot comment on issues.
+
+    Returns 404 instead of 403 to avoid leaking resource existence.
+    """
     response = await client.post(
         f"/issues/{test_issue.issue_id}/comments",
         headers=member_auth_headers,
         json={"body": "I should not be allowed"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.asyncio

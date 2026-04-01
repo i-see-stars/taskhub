@@ -270,7 +270,13 @@ class CreateCommentUseCase:
         )
         await self._issue_repo.save(issue)
         await self._unit_of_work.commit()
-        return comment
+        # Re-fetch to get DB-generated timestamps
+        saved_issue = await self._issue_repo.get_with_comments(IssueId(issue_id))
+        saved_comment = next(
+            (c for c in saved_issue.comments if c.comment_id == comment.comment_id),
+            comment,
+        )
+        return saved_comment
 
 
 class DeleteCommentUseCase:

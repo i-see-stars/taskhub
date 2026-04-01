@@ -6,7 +6,7 @@ Depends on domain abstractions only (Repository, UnitOfWork).
 
 from __future__ import annotations
 
-from app.issue_tracking.domain.entities import Project
+from app.issue_tracking.domain.entities import Project, ProjectMember
 from app.issue_tracking.domain.exceptions import (
     DuplicateProjectKey,
     InsufficientPermissions,
@@ -173,14 +173,17 @@ class AddProjectMemberUseCase:
         requesting_user_id: str,
         target_user_id: str,
         role: ProjectRole,
-    ) -> None:
-        """Add member.
+    ) -> ProjectMember:
+        """Add member. Returns the newly added ProjectMember.
 
         Args:
             project_id: The project UUID.
             requesting_user_id: Must be OWNER.
             target_user_id: The user to add.
             role: The role to assign.
+
+        Returns:
+            The newly added ProjectMember with timestamps populated.
 
         Raises:
             ProjectNotFound: If project doesn't exist.
@@ -193,9 +196,12 @@ class AddProjectMemberUseCase:
             raise InsufficientPermissions("Only owners can add members")
         if project.get_member(UserId(target_user_id)):
             raise UserAlreadyProjectMember(target_user_id)
-        project.add_member(UserId(target_user_id), role)
-        await self._repo.save(project)
+        member = project.add_member(UserId(target_user_id), role)
+        saved_project = await self._repo.save(project)
         await self._unit_of_work.commit()
+        # Return the member from the saved project (has created_at populated)
+        saved_member = saved_project.get_member(UserId(target_user_id))
+        return saved_member if saved_member is not None else member
 
 
 class RemoveProjectMemberUseCase:
@@ -268,14 +274,17 @@ class UpdateMemberRoleUseCase:
         requesting_user_id: str,
         target_user_id: str,
         new_role: ProjectRole,
-    ) -> None:
-        """Update role.
+    ) -> ProjectMember:
+        """Update role. Returns the updated ProjectMember.
 
         Args:
             project_id: The project UUID.
             requesting_user_id: Must be OWNER.
             target_user_id: The user whose role changes.
             new_role: The new role to assign.
+
+        Returns:
+            The updated ProjectMember with timestamps populated.
 
         Raises:
             ProjectNotFound: If project doesn't exist.
@@ -295,5 +304,7 @@ class UpdateMemberRoleUseCase:
             if len(owners) <= 1:
                 raise LastOwnerCannotBeRemoved("Cannot demote the last owner")
         target.role = new_role
-        await self._repo.save(project)
+        saved_project = await self._repo.save(project)
         await self._unit_of_work.commit()
+        saved_member = saved_project.get_member(UserId(target_user_id))
+        return saved_member if saved_member is not None else target

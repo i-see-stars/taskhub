@@ -46,6 +46,8 @@ class Issue(AggregateRoot):
     reporter_id: UserId
     parent_id: IssueId | None
     comments: list[Comment] = field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     def assign_to(self, assignee_id: UserId | None) -> None:
         """Assign issue to a user. Emits IssueAssigned if assignee changes.
@@ -115,6 +117,7 @@ class ProjectMember(Entity):
     project_id: ProjectId
     user_id: UserId
     role: ProjectRole
+    created_at: datetime | None = None
 
 
 @dataclass(eq=False)
@@ -126,6 +129,8 @@ class Project(AggregateRoot):
     key: str
     description: str | None
     members: list[ProjectMember] = field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     def add_member(self, user_id: UserId, role: ProjectRole) -> ProjectMember:
         """Add a member to the project.

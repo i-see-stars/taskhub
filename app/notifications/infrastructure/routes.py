@@ -3,16 +3,22 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_session
 from app.identity.infrastructure.deps import get_current_user
 from app.identity.infrastructure.jwt import verify_jwt_token
 from app.identity.infrastructure.models import UserModel
+from app.notifications.application.use_cases import MarkNotificationReadUseCase
+from app.notifications.domain.exceptions import (
+    NotificationAccessDenied,
+    NotificationNotFound,
+)
 from app.notifications.infrastructure import api_messages
 from app.notifications.infrastructure.connection_manager import ConnectionManager
-from app.notifications.infrastructure.deps import get_connection_manager
+from app.notifications.infrastructure.deps import (
+    get_connection_manager,
+    get_mark_notification_read_use_case,
+    resolve_notification_list,
+)
 from app.notifications.infrastructure.models import NotificationModel
 from app.notifications.infrastructure.schemas import (
     NotificationListResponse,
@@ -26,29 +32,9 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 @router.get("", response_model=NotificationListResponse)
 async def list_notifications(
-    is_read: bool | None = Query(None),
-    session: AsyncSession = Depends(get_session),
-    current_user: UserModel = Depends(get_current_user),
+    notifications: list[NotificationModel] = Depends(resolve_notification_list),
 ) -> NotificationListResponse:
-    """List notifications for the current user.
-
-    Args:
-        is_read: Optional filter by read status.
-        session: Database session.
-        current_user: The authenticated user.
-
-    Returns:
-        List of notifications.
-    """
-    query = select(NotificationModel).where(
-        NotificationModel.user_id == current_user.user_id
-    )
-    if is_read is not None:
-        query = query.where(NotificationModel.is_read == is_read)
-    query = query.order_by(NotificationModel.created_at.desc())
-
-    result = await session.execute(query)
-    notifications = result.scalars().all()
+    """List notifications for the current user."""
     return NotificationListResponse(
         notifications=list(notifications), total=len(notifications)
     )
@@ -57,45 +43,31 @@ async def list_notifications(
 @router.patch("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(
     notification_id: str,
-    session: AsyncSession = Depends(get_session),
     current_user: UserModel = Depends(get_current_user),
-) -> NotificationModel:
-    """Mark a notification as read.
-
-    Args:
-        notification_id: The notification UUID.
-        session: Database session.
-        current_user: The authenticated user.
-
-    Returns:
-        Updated notification.
-
-    Raises:
-        HTTPException: 404 if not found, 403 if not the owner.
-    """
-    result = await session.execute(
-        select(NotificationModel).where(
-            NotificationModel.notification_id == notification_id
-        )
-    )
-    notification = result.scalar_one_or_none()
-
-    if not notification:
+    use_case: MarkNotificationReadUseCase = Depends(
+        get_mark_notification_read_use_case
+    ),
+) -> NotificationResponse:
+    """Mark a notification as read."""
+    try:
+        notification = await use_case.execute(notification_id, current_user.user_id)
+    except NotificationNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=api_messages.NOTIFICATION_NOT_FOUND,
-        )
-
-    if notification.user_id != current_user.user_id:
+        ) from None
+    except NotificationAccessDenied:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=api_messages.NOTIFICATION_ACCESS_DENIED,
-        )
-
-    notification.is_read = True
-    await session.commit()
-    await session.refresh(notification)
-    return notification
+        ) from None
+    return NotificationResponse(
+        notification_id=notification.notification_id.value,
+        issue_id=notification.issue_id,
+        message=notification.message,
+        is_read=notification.is_read,
+        created_at=notification.created_at,
+    )
 
 
 @router.websocket("/ws")

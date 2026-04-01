@@ -57,6 +57,7 @@ class PostgresProjectRepository(ProjectRepository):
             project_id=ProjectId(m.project_id),
             user_id=UserId(m.user_id),
             role=ProjectRole(m.role),
+            created_at=m.created_at,
         )
 
     def _to_domain(self, model: ProjectModel) -> Project:
@@ -74,6 +75,8 @@ class PostgresProjectRepository(ProjectRepository):
             key=model.key,
             description=model.description,
             members=[self._member_to_domain(m) for m in model.members],
+            created_at=model.created_at,
+            updated_at=model.updated_at,
         )
 
     async def get_by_id(self, project_id: object) -> Project:
@@ -96,9 +99,9 @@ class PostgresProjectRepository(ProjectRepository):
     async def save(self, project: Project) -> Project:
         """Persist new or updated project."""
         result = await self.session.execute(
-            select(ProjectModel).where(
-                ProjectModel.project_id == project.project_id.value
-            )
+            select(ProjectModel)
+            .options(selectinload(ProjectModel.members))
+            .where(ProjectModel.project_id == project.project_id.value)
         )
         model = result.scalar_one_or_none()
         if model is None:
@@ -110,19 +113,8 @@ class PostgresProjectRepository(ProjectRepository):
             )
             self.session.add(model)
             await self.session.flush()
-        else:
-            model.name = project.name
-            model.key = project.key
-            model.description = project.description
-
-        # Sync members: delete removed, add new
-        existing_ids = {m.user_id for m in model.members}
-        domain_ids = {m.user_id.value for m in project.members}
-        for m in list(model.members):
-            if m.user_id not in domain_ids:
-                await self.session.delete(m)
-        for dm in project.members:
-            if dm.user_id.value not in existing_ids:
+            # New model has no members yet — just add all
+            for dm in project.members:
                 self.session.add(
                     ProjectMemberModel(
                         project_id=model.project_id,
@@ -130,15 +122,41 @@ class PostgresProjectRepository(ProjectRepository):
                         role=dm.role,
                     )
                 )
-            else:
-                # Update role if changed
-                for m in model.members:
-                    if m.user_id == dm.user_id.value:
-                        m.role = dm.role
+        else:
+            model.name = project.name
+            model.key = project.key
+            model.description = project.description
+
+            # Sync members: delete removed, add new, update existing
+            existing_ids = {m.user_id for m in model.members}
+            domain_ids = {m.user_id.value for m in project.members}
+            for m in list(model.members):
+                if m.user_id not in domain_ids:
+                    await self.session.delete(m)
+            for dm in project.members:
+                if dm.user_id.value not in existing_ids:
+                    self.session.add(
+                        ProjectMemberModel(
+                            project_id=model.project_id,
+                            user_id=dm.user_id.value,
+                            role=dm.role,
+                        )
+                    )
+                else:
+                    for m in model.members:
+                        if m.user_id == dm.user_id.value:
+                            m.role = dm.role
 
         await self.session.flush()
-        # Reload with members
+        # Full reload including relationships
         await self.session.refresh(model)
+        # Eagerly load members to avoid lazy-load in async
+        result = await self.session.execute(
+            select(ProjectModel)
+            .options(selectinload(ProjectModel.members))
+            .where(ProjectModel.project_id == model.project_id)
+        )
+        model = result.scalar_one()
         return self._to_domain(model)
 
     async def list_for_user(self, user_id: object) -> list[Project]:
@@ -208,6 +226,8 @@ class PostgresIssueRepository(IssueRepository):
             assignee_id=UserId(model.assignee_id) if model.assignee_id else None,
             reporter_id=UserId(model.reporter_id),
             parent_id=IssueId(model.parent_id) if model.parent_id else None,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
         )
 
     def _to_model(self, entity: Issue) -> IssueModel:

@@ -318,6 +318,140 @@ except Exception as e:
 
 ## Architecture Guidelines
 
+### Architectural Approach: DDD + Clean Architecture + Hexagonal
+
+TaskHub uses **Domain-Driven Design (DDD)** with **Clean Architecture** principles and elements of **Hexagonal Architecture (Ports & Adapters)**.
+
+#### Layer Dependencies (Clean Architecture)
+
+Dependencies point **inward only**. Outer layers depend on inner layers, never the reverse.
+
+```
+Infrastructure → Application → Domain → Shared Kernel
+```
+
+| Layer | Contains | Depends On |
+|---|---|---|
+| **Domain** | Entities, Aggregates, Value Objects, Repository ABCs, Domain Events, Domain Exceptions | Shared Kernel only |
+| **Application** | Use Cases, Application Services, Port ABCs (PasswordHasher, TokenService) | Domain abstractions |
+| **Infrastructure** | ORM Models, Repository implementations, Adapters, Routes, Deps, Schemas, Queries | Application + Domain (via abstractions) |
+| **Shared Kernel** | Base classes (Entity, AggregateRoot, ValueObject), UnitOfWork ABC, Identifiers, DomainEvent | Nothing |
+
+#### Dependency Inversion Principle (DIP)
+
+Application and domain layers **never depend on infrastructure**. They depend on abstractions:
+
+- Use Cases depend on `Repository` (ABC), `UnitOfWork` (ABC), `PasswordHasher` (ABC) — not on `PostgresUserRepository`, `SqlAlchemyUnitOfWork`, `BcryptPasswordHasher`
+- Concrete implementations are injected at the infrastructure layer via `deps.py`
+- The `session` object **never appears** in use cases or domain code
+
+#### Hexagonal Architecture: Ports & Adapters
+
+- **Ports** (interfaces/ABCs): `UserRepository`, `UnitOfWork`, `PasswordHasher`, `TokenService`
+- **Adapters** (implementations): `PostgresUserRepository`, `SqlAlchemyUnitOfWork`, `BcryptPasswordHasher`, `JWTTokenService`
+- Ports live in domain (`domain/repositories.py`) or application (`application/ports.py`) layers
+- Adapters live in infrastructure (`infrastructure/repositories.py`, `infrastructure/adapters.py`)
+
+#### Repository + UnitOfWork Pattern
+
+**Both are always used together in use cases.** They share the same database session (shared transactional context), but have different responsibilities:
+
+- **Repository**: Data access — load/save aggregates
+- **UnitOfWork**: Transaction boundary — commit/rollback
+
+Without UoW, use cases would call `session.commit()` directly → DIP violation. Without Repository, use cases would query the DB directly → also DIP violation.
+
+```python
+# CORRECT — use case depends on abstractions
+class RegisterUseCase:
+    def __init__(self, user_repo: UserRepository, unit_of_work: UnitOfWork, ...):
+        ...
+    async def execute(self, ...):
+        await self._user_repo.save(user)
+        await self._unit_of_work.commit()
+
+# WRONG — use case depends on infrastructure
+class RegisterUseCase:
+    def __init__(self, session: AsyncSession, ...):
+        ...
+    async def execute(self, ...):
+        session.add(model)
+        await session.commit()
+```
+
+#### Wiring: deps.py
+
+All infrastructure wiring happens in `deps.py` (infrastructure layer). Routes receive fully-wired use cases/services via FastAPI `Depends()`:
+
+```python
+# deps.py — infrastructure wiring
+def get_register_use_case(session = Depends(get_session)) -> RegisterUseCase:
+    return RegisterUseCase(
+        user_repo=PostgresUserRepository(session),
+        unit_of_work=SqlAlchemyUnitOfWork(session),
+        password_hasher=BcryptPasswordHasher(),
+    )
+
+# routes.py — thin, no SQLAlchemy imports
+@router.post("/register")
+async def register(data: UserCreateRequest,
+                   use_case: RegisterUseCase = Depends(get_register_use_case)):
+    user = await use_case.execute(data.email, data.password)
+    return UserResponse(...)
+```
+
+#### DDD Building Blocks
+
+| Concept | Location | Examples |
+|---|---|---|
+| **Aggregate Root** | `domain/entities.py` | `User`, `Project`, `Issue` |
+| **Entity** | `domain/entities.py` | `RefreshToken`, `Comment`, `ProjectMember` |
+| **Value Object** | `domain/value_objects.py` | `Email`, `ProjectRole`, `IssueStatus` |
+| **Domain Event** | `domain/events.py` | `UserRegistered`, `IssueAssigned` |
+| **Repository (ABC)** | `domain/repositories.py` | `UserRepository`, `ProjectRepository` |
+| **Application Port (ABC)** | `application/ports.py` | `PasswordHasher`, `TokenService` |
+| **Use Case** | `application/use_cases.py` or `application/*_use_cases.py` | `RegisterUseCase`, `CreateProjectUseCase`, `UpdateIssueUseCase` |
+
+#### Repositories: Only for Aggregate Roots
+
+Create repositories **only for aggregate roots**, not for child entities:
+- `UserRepository` — User is an aggregate root
+- `ProjectRepository` — Project is an aggregate root
+- `IssueRepository` — Issue is an aggregate root
+
+Child entities (Comment, ProjectMember, RefreshToken) are managed through their aggregate root's repository or service. For example, comments are created, listed, and deleted through the Issue aggregate via `IssueRepository.get_with_comments()` and `IssueRepository.save()` — there is no `CommentRepository`.
+
+#### CQRS-Lite: Read vs Write
+
+- **Write operations** → Use Cases / App Services → Domain → Repository + UoW
+- **Read operations** → Query functions in `infrastructure/queries.py` → optimized SQL → ORM models
+- Read queries bypass the domain layer for performance (no N+1 queries)
+- Read dependencies are wired in `deps.py` as `resolve_*` functions
+
+#### Thin Routes
+
+Routes must be thin — only HTTP concerns:
+1. Extract request data (FastAPI handles this)
+2. Call use case / service (injected via Depends)
+3. Map domain exceptions → HTTPException
+4. Return response
+
+Routes must **never**:
+- Import SQLAlchemy
+- Execute raw queries
+- Contain business logic
+- Create domain entities directly
+
+#### Bounded Contexts
+
+| Context | Responsibility | Aggregates |
+|---|---|---|
+| **Identity** | User registration, auth, password management | User |
+| **Issue Tracking** | Projects, issues, comments, membership | Project, Issue |
+| **Notifications** | In-app + email notifications, WebSocket push | Notification |
+
+Contexts communicate via **domain events** (e.g., `IssueAssigned` → `NotificationDispatcher`), not direct imports. The event bus is request-scoped and synchronous within the same transaction.
+
 ### Project Structure
 
 ```
