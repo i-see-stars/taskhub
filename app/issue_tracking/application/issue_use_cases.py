@@ -135,7 +135,7 @@ class UpdateIssueUseCase:
         issue_id: str,
         requesting_user_id: str,
         **fields: object,
-    ) -> None:
+    ) -> Issue:
         """Update issue, emit IssueAssigned / IssueStatusChanged events.
 
         Args:
@@ -143,6 +143,9 @@ class UpdateIssueUseCase:
             requesting_user_id: The user performing the update.
             **fields: Fields to update (title, description, type, status,
                       priority, parent_id, assignee_id).
+
+        Returns:
+            Updated Issue aggregate.
 
         Raises:
             IssueNotFound: If issue doesn't exist or user has no access.
@@ -172,10 +175,11 @@ class UpdateIssueUseCase:
             if value is not None:
                 setattr(issue, field_name, value)
 
-        await self._issue_repo.save(issue)
+        saved = await self._issue_repo.save(issue)
         for event in issue.pull_events():
             await self._event_bus.publish(event)
         await self._unit_of_work.commit()
+        return saved
 
 
 class DeleteIssueUseCase:
