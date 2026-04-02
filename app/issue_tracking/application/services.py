@@ -17,7 +17,6 @@ from app.issue_tracking.domain.exceptions import (
     IssueNotFound,
 )
 from app.issue_tracking.domain.repositories import (
-    CommentRepository,
     IssueRepository,
     ProjectRepository,
 )
@@ -145,7 +144,6 @@ class IssueAppService:
         self,
         issue_repo: IssueRepository,
         project_repo: ProjectRepository,
-        comment_repo: CommentRepository,
         uow: UnitOfWork,
         event_bus: EventBus,
     ) -> None:
@@ -154,13 +152,11 @@ class IssueAppService:
         Args:
             issue_repo: Abstract issue repository.
             project_repo: Abstract project repository.
-            comment_repo: Abstract comment repository.
             uow: Unit of work for transaction management.
             event_bus: Request-scoped event bus with notification handler subscribed.
         """
         self._issue_repo = issue_repo
         self._project_repo = project_repo
-        self._comment_repo = comment_repo
         self._uow = uow
         self._event_bus = event_bus
 
@@ -305,24 +301,27 @@ class IssueAppService:
     async def create_comment(self, issue_id: str, author_id: str, body: str) -> Comment:
         """Add a comment to an issue.
 
+        Args:
+            issue_id: The issue UUID.
+            author_id: The commenting user's ID.
+            body: Comment text.
+
         Returns:
             Created Comment entity.
         """
-        # Verify issue exists and user has access
-        issue = await self._issue_repo.get_by_id(IssueId(issue_id))
+        issue = await self._issue_repo.get_with_comments(IssueId(issue_id))
         project = await self._project_repo.get_by_id(issue.project_id)
         if not project.get_member(UserId(author_id)):
             raise IssueNotFound(issue_id)
 
-        comment = Comment(
+        comment = issue.add_comment(
             comment_id=CommentId(str(uuid.uuid4())),
-            issue_id=IssueId(issue_id),
             author_id=UserId(author_id),
             body=body,
         )
-        saved = await self._comment_repo.save(comment)
+        await self._issue_repo.save(issue)
         await self._uow.commit()
-        return saved
+        return comment
 
     async def list_comments(
         self, issue_id: str, requesting_user_id: str
@@ -336,9 +335,9 @@ class IssueAppService:
         Returns:
             List of Comment entities.
         """
-        issue = await self._issue_repo.get_by_id(IssueId(issue_id))
+        issue = await self._issue_repo.get_with_comments(IssueId(issue_id))
         project = await self._project_repo.get_by_id(issue.project_id)
         if not project.get_member(UserId(requesting_user_id)):
             raise IssueNotFound(issue_id)
 
-        return await self._comment_repo.list_for_issue(IssueId(issue_id))
+        return issue.comments

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_session
+# Use case types imported for Depends() type annotations — infrastructure depends on application, which is correct.
 from app.identity.application.use_cases import (
     AuthenticateUseCase,
     ChangePasswordUseCase,
@@ -23,13 +21,15 @@ from app.identity.domain.exceptions import (
     TokenNotFound,
 )
 from app.identity.infrastructure import api_messages
-from app.identity.infrastructure.adapters import BcryptPasswordHasher, JWTTokenService
-from app.identity.infrastructure.deps import get_current_user
-from app.identity.infrastructure.models import UserModel
-from app.identity.infrastructure.repositories import (
-    PostgresRefreshTokenRepository,
-    PostgresUserRepository,
+from app.identity.infrastructure.deps import (
+    get_authenticate_use_case,
+    get_change_password_use_case,
+    get_current_user,
+    get_delete_account_use_case,
+    get_refresh_token_use_case,
+    get_register_use_case,
 )
+from app.identity.infrastructure.models import UserModel
 from app.identity.infrastructure.schemas import (
     AccessTokenResponse,
     RefreshTokenRequest,
@@ -38,12 +38,8 @@ from app.identity.infrastructure.schemas import (
     UserUpdatePasswordRequest,
 )
 from app.shared.domain.identifiers import UserId
-from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 router = APIRouter(responses=api_messages.UNAUTHORIZED_RESPONSES)
-
-_password_hasher = BcryptPasswordHasher()
-_token_service = JWTTokenService()
 
 
 @router.get("/me", response_model=UserResponse, description="Get current user")
@@ -61,13 +57,9 @@ async def read_current_user(
 )
 async def delete_current_user(
     current_user: UserModel = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    use_case: DeleteAccountUseCase = Depends(get_delete_account_use_case),
 ) -> None:
     """Delete the current user's account."""
-    use_case = DeleteAccountUseCase(
-        user_repo=PostgresUserRepository(session),
-        uow=SqlAlchemyUnitOfWork(session),
-    )
     await use_case.execute(UserId(current_user.user_id))
 
 
@@ -78,15 +70,10 @@ async def delete_current_user(
 )
 async def reset_current_user_password(
     user_update_password: UserUpdatePasswordRequest,
-    session: AsyncSession = Depends(get_session),
     current_user: UserModel = Depends(get_current_user),
+    use_case: ChangePasswordUseCase = Depends(get_change_password_use_case),
 ) -> None:
     """Update the current user's password."""
-    use_case = ChangePasswordUseCase(
-        user_repo=PostgresUserRepository(session),
-        uow=SqlAlchemyUnitOfWork(session),
-        password_hasher=_password_hasher,
-    )
     await use_case.execute(UserId(current_user.user_id), user_update_password.password)
 
 
@@ -97,17 +84,10 @@ async def reset_current_user_password(
     description="OAuth2 compatible token, get an access token for future requests using username and password",
 )
 async def login_access_token(
-    session: AsyncSession = Depends(get_session),
     form_data: OAuth2PasswordRequestForm = Depends(),
+    use_case: AuthenticateUseCase = Depends(get_authenticate_use_case),
 ) -> AccessTokenResponse:
     """Login with email and password to get an access token."""
-    use_case = AuthenticateUseCase(
-        user_repo=PostgresUserRepository(session),
-        token_repo=PostgresRefreshTokenRepository(session),
-        uow=SqlAlchemyUnitOfWork(session),
-        password_hasher=_password_hasher,
-        token_service=_token_service,
-    )
     try:
         access_token, refresh_token_str, refresh_exp = await use_case.execute(
             email=form_data.username,
@@ -134,14 +114,9 @@ async def login_access_token(
 )
 async def refresh_token(
     data: RefreshTokenRequest,
-    session: AsyncSession = Depends(get_session),
+    use_case: RefreshTokenUseCase = Depends(get_refresh_token_use_case),
 ) -> AccessTokenResponse:
     """Refresh an access token using a refresh token."""
-    use_case = RefreshTokenUseCase(
-        token_repo=PostgresRefreshTokenRepository(session),
-        uow=SqlAlchemyUnitOfWork(session),
-        token_service=_token_service,
-    )
     try:
         access_token, new_refresh_str, refresh_exp = await use_case.execute(
             data.refresh_token
@@ -177,14 +152,9 @@ async def refresh_token(
 )
 async def register_new_user(
     new_user: UserCreateRequest,
-    session: AsyncSession = Depends(get_session),
-) -> UserModel:
+    use_case: RegisterUseCase = Depends(get_register_use_case),
+) -> UserResponse:
     """Register a new user account."""
-    use_case = RegisterUseCase(
-        user_repo=PostgresUserRepository(session),
-        uow=SqlAlchemyUnitOfWork(session),
-        password_hasher=_password_hasher,
-    )
     try:
         user_entity = await use_case.execute(
             email=str(new_user.email),
@@ -195,8 +165,6 @@ async def register_new_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=api_messages.EMAIL_ADDRESS_ALREADY_USED,
         ) from None
-    # Fetch the ORM model for response serialization
-    result = await session.execute(
-        select(UserModel).where(UserModel.user_id == user_entity.id.value)
+    return UserResponse(
+        user_id=user_entity.id.value, email=str(user_entity.email.value)
     )
-    return result.scalar_one()
