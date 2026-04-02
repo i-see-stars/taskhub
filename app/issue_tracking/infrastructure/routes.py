@@ -404,12 +404,11 @@ async def update_issue(
     issue_data: IssueUpdate,
     current_user: UserModel = Depends(get_current_user),
     use_case: UpdateIssueUseCase = Depends(get_update_issue_use_case),
-    issue_model: IssueModel = Depends(resolve_issue),
-) -> IssueModel:
+) -> IssueResponse:
     """Update issue. Uses UpdateIssueUseCase for domain logic and event bus."""
     update_fields = issue_data.model_dump(exclude_unset=True)
     try:
-        await use_case.execute(
+        issue = await use_case.execute(
             issue_id=issue_id,
             requesting_user_id=current_user.user_id,
             **update_fields,
@@ -428,9 +427,20 @@ async def update_issue(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Assignee must be a member of the project",
         ) from None
-    # issue_model was loaded in same session before use case — SQLAlchemy
-    # expires it after commit, so serialization will trigger a fresh load.
-    return issue_model
+    return IssueResponse(
+        issue_id=issue.issue_id.value,
+        project_id=issue.project_id.value,
+        type=issue.type,
+        title=issue.title,
+        description=issue.description,
+        status=issue.status,
+        priority=issue.priority,
+        assignee_id=issue.assignee_id.value if issue.assignee_id else None,
+        reporter_id=issue.reporter_id.value,
+        parent_id=issue.parent_id.value if issue.parent_id else None,
+        created_at=issue.created_at,
+        updated_at=issue.updated_at,
+    )
 
 
 @router.delete(

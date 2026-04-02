@@ -1,1 +1,1 @@
-"""Issue tracking application layer — services that orchestrate domain logic."""
+"""Issue tracking application layer — use cases that orchestrate domain logic."""
