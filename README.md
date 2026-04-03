@@ -12,176 +12,210 @@
 
 ---
 
-## ✨ Key Features
+## Prerequisites
 
-*   🏛️ **Domain-Driven Design**: Three bounded contexts — `identity`, `issue_tracking`, `notifications` — each fully isolated with their own domain models, repositories, and application services.
-*   🧅 **Clean Architecture**: Domain layer has zero framework dependencies. Infrastructure (SQLAlchemy, FastAPI) depends on domain, never the other way around.
-*   📨 **In-process Event Bus**: Bounded contexts communicate via domain events (`IssueAssigned`, etc.) through a request-scoped event bus — no direct coupling between contexts.
-*   🔐 **Secure Authentication**: JWT-based auth with Refresh Token rotation and password hashing using `bcrypt`.
-*   📊 **Project & Issue Management**: Hierarchical task structures (Epic -> Story -> Task -> Bug).
-*   🚀 **Full Asynchronicity**: The entire stack, from API to database (`asyncpg`), operates asynchronously.
-*   🛡️ **Out-of-the-box Security**: Middleware for CORS, Trusted Hosts, and robust data validation via Pydantic v2.
-*   ✅ **Code Quality**: 84%+ test coverage, strict static analysis (`mypy`), and modern linting (`ruff`).
-*   🐳 **Production-ready**: Optimized multi-stage Docker builds and CI/CD via GitHub Actions.
-*   🔄 **Database Migrations**: Async-supported schema management using Alembic.
+- **Python 3.14+**
+- **[uv](https://github.com/astral-sh/uv)** (package manager)
+- **Docker** and **Docker Compose** (for PostgreSQL, or full-stack deployment)
 
 ---
 
-## 🛠 Tech Stack
+## Quick Start (Local Development)
 
-| Category | Technology |
-| :--- | :--- |
-| **Framework** | [FastAPI](https://fastapi.tiangolo.com/) (Python 3.14+) |
-| **Database** | [PostgreSQL 16+](https://www.postgresql.org/) |
-| **ORM** | [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (Async) |
-| **Migrations** | [Alembic](https://alembic.sqlalchemy.org/) |
-| **Auth** | [PyJWT](https://pyjwt.readthedocs.io/), [bcrypt](https://github.com/pyca/bcrypt/) |
-| **Package Manager**| [uv](https://github.com/astral-sh/uv) (Extremely fast) |
-| **Validation** | [Pydantic v2](https://docs.pydantic.dev/) |
-| **Testing** | [pytest](https://docs.pytest.org/), [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio), [httpx](https://www.python-httpx.org/) |
-| **Linting/Formatting**| [Ruff](https://github.com/astral-sh/ruff), [Mypy](http://mypy-lang.org/) |
+The most common workflow: PostgreSQL runs in Docker, the app runs locally with hot-reload.
 
----
+### 1. Clone and install
 
-## 🚦 Quick Start
-
-The project uses `uv` for package management and a `Makefile` to automate routine tasks.
-
-### 1. Environment Setup
 ```bash
-# Clone the repository
 git clone https://github.com/i-see-stars/taskhub.git
 cd taskhub
-
-# Install dependencies (including dev tools)
 make dev-install
 ```
 
-### 2. Configuration
+### 2. Configure environment
+
 ```bash
 cp .env.example .env
-# Generate a secret key
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-# Update SECRET_KEY and DATABASE_URL in your .env file
 ```
 
-### 3. Database & Migrations
-```bash
-# Start PostgreSQL (if not running locally)
-make docker-up
+Edit `.env` and set a real `SECRET_KEY`:
 
-# Apply migrations
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+For local development the defaults work out of the box (DB at `localhost:5432`, user/password `taskhub/taskhub`).
+
+### 3. Start PostgreSQL
+
+```bash
+make docker-db
+```
+
+This starts only the PostgreSQL container (exposed on port 5432).
+
+### 4. Apply migrations
+
+```bash
 make migrate
 ```
 
-### 4. Run Application
+### 5. Run the app
+
 ```bash
 make run
 ```
-API will be available at: [http://localhost:8000](http://localhost:8000)
-Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+The app starts with hot-reload at:
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs (available when `DEBUG=true`)
+- ReDoc: http://localhost:8000/redoc (available when `DEBUG=true`)
 
 ---
 
-## 🏗 Project Architecture
+## Running Tests
 
-The project follows **Domain-Driven Design** with **Clean Architecture** layering. Each bounded context is self-contained and organized into three layers: domain → application → infrastructure.
+Tests use a separate database `taskhub_test` to avoid touching dev data.
 
-```text
+### 1. Create the test database (once)
+
+Make sure PostgreSQL is running (`make docker-db`), then:
+
+```bash
+make docker-db-test
+```
+
+### 2. Run tests
+
+```bash
+make test          # with coverage report
+make test-fast     # without coverage (faster)
+```
+
+---
+
+## Full Docker Deployment
+
+Run the entire stack (PostgreSQL + API) in Docker. Useful for production-like environments.
+
+### 1. Configure environment
+
+```bash
+cp .env.example .env
+# Edit .env: set SECRET_KEY, DEBUG=false, ALLOWED_HOSTS, CORS_ORIGINS
+```
+
+### 2. Build and start
+
+```bash
+docker compose up -d --build
+```
+
+### 3. Apply migrations
+
+Run from the host machine (the DB port is exposed):
+
+```bash
+make migrate
+```
+
+Or run directly inside the API container:
+
+```bash
+docker compose exec api /app/.venv/bin/alembic upgrade head
+```
+
+The API is available at http://localhost:8000.
+
+### Production checklist
+
+- [ ] Strong `SECRET_KEY` is configured
+- [ ] `DEBUG=false`
+- [ ] `ALLOWED_HOSTS` contains only trusted domains
+- [ ] `CORS_ORIGINS` contains only trusted origins
+- [ ] HTTPS is configured (via reverse proxy like Nginx or Traefik)
+
+---
+
+## Available Make Commands
+
+| Command | Description |
+|---|---|
+| `make run` | Run dev server with hot-reload |
+| `make run-prod` | Run production server locally (no hot-reload) |
+| `make test` | Run tests with coverage |
+| `make test-fast` | Run tests without coverage |
+| `make lint` | Run ruff linter |
+| `make format` | Format code with ruff |
+| `make type-check` | Run mypy type checking |
+| `make check` | Run all checks (lint + type-check + tests) |
+| `make ci` | Alias for `make check` |
+| `make migrate` | Apply database migrations |
+| `make migration MESSAGE="desc"` | Create a new migration |
+| `make docker-db` | Start only PostgreSQL in Docker |
+| `make docker-db-test` | Create the test database |
+| `make docker-up` | Start all services (DB + API) |
+| `make docker-down` | Stop all Docker services |
+| `make docker-logs` | Tail Docker logs |
+| `make docker-build` | Build Docker image |
+| `make dev-install` | Install dependencies + pre-commit hooks |
+| `make install` | Install production dependencies only |
+| `make clean` | Remove cache and temporary files |
+
+---
+
+## Project Structure
+
+```
 taskhub/
 ├── app/
-│   ├── shared/                     # Shared kernel (base classes, identifiers, domain events)
-│   │   └── domain/
-│   │       ├── base.py             # AggregateRoot, Entity, ValueObject
-│   │       ├── events.py           # DomainEvent base class
-│   │       └── identifiers.py      # Typed IDs (UserId, IssueId, ...)
-│   │
+│   ├── shared/                     # Shared kernel (base classes, identifiers, events)
 │   ├── identity/                   # Bounded context: authentication & users
 │   │   ├── domain/                 # Entities (User, RefreshToken), VOs (Email), repos
 │   │   ├── application/            # Use cases (register, login, refresh token)
 │   │   └── infrastructure/         # ORM models, JWT, password hashing, routes
-│   │
 │   ├── issue_tracking/             # Bounded context: projects, issues, comments
-│   │   ├── domain/                 # Aggregates (Project, Issue), VOs, domain events, repos
-│   │   ├── application/            # App services orchestrating domain + event bus
+│   │   ├── domain/                 # Aggregates (Project, Issue), VOs, events, repos
+│   │   ├── application/            # Use cases orchestrating domain + event bus
 │   │   └── infrastructure/         # ORM models, repositories, queries, routes
-│   │
 │   ├── notifications/              # Bounded context: in-app & email notifications
 │   │   ├── domain/                 # Notification entity, repository interface
 │   │   ├── application/            # NotificationDispatcher (handles domain events)
 │   │   └── infrastructure/         # ORM model, WebSocket manager, routes
-│   │
 │   ├── core/                       # Shared infrastructure (DB engine, config, event bus)
 │   └── main.py                     # FastAPI app entry point
-│
 ├── alembic/                        # Database migrations
-├── tests/                          # Integration test suite (pytest + real DB)
+├── tests/                          # Test suite (pytest + real DB)
 ├── Dockerfile                      # Multi-stage production build
+├── docker-compose.yml              # PostgreSQL + API services
 ├── Makefile                        # Development and CI commands
-└── pyproject.toml                  # Tooling and dependency configuration
+└── pyproject.toml                  # Dependencies and tool configuration
 ```
 
-### Architectural layers
+---
 
-| Layer | Responsibility | Depends on |
-| :--- | :--- | :--- |
-| **Domain** | Entities, aggregates, value objects, domain events, repository interfaces | Nothing |
-| **Application** | Use cases, orchestration, event publishing | Domain only |
-| **Infrastructure** | ORM models, DB queries, FastAPI routes, external services | Domain + Application |
+## Key Features
 
-### CQRS-lite
-
-Read and write paths are intentionally separated. Writes go through domain aggregates and application services to enforce invariants and emit events. Reads bypass aggregates entirely — they query the database directly via optimized JOIN queries in `infrastructure/queries.py` and return response schemas without loading domain objects. This keeps read endpoints fast without sacrificing domain integrity on writes.
+- **Domain-Driven Design**: Three bounded contexts (identity, issue_tracking, notifications), each fully isolated
+- **Clean Architecture**: Domain layer has zero framework dependencies
+- **In-process Event Bus**: Bounded contexts communicate via domain events
+- **JWT Authentication**: Access + Refresh Token rotation with bcrypt password hashing
+- **Project & Issue Management**: Hierarchical tasks (Epic -> Story -> Task -> Bug)
+- **Full Async**: Entire stack from API to database (asyncpg)
+- **CQRS-lite**: Separated read/write paths for performance
+- **WebSocket Notifications**: Real-time push via WebSocket
 
 ---
 
-## 🧪 Quality & Testing
+## Security
 
-We maintain high standards of code quality. To run the full suite:
-
-```bash
-# Run all checks (Linter, Type-check, Tests)
-make check
-
-# Run tests only with coverage report
-make test
-```
-
-Linting and formatting follow Google-style (docstrings) and PEP8. All commits are verified via `pre-commit` hooks.
+- Passwords hashed with bcrypt (adaptive salt rounds)
+- Short-lived Access Tokens (15 min), long-lived Refresh Tokens (28 days) with one-time use
+- TrustedHostMiddleware and CORSMiddleware in production
+- Docker containers run as non-root user
 
 ---
 
-## 🔒 Security
-
-*   **Passwords**: Never stored in plain text. Hashed using `bcrypt` with adaptive salt rounds.
-*   **JWT**: Short-lived Access Tokens (15 min) and long-lived Refresh Tokens (28 days) with one-time use policy (Refresh Token Reuse Detection).
-*   **Middleware**:
-    *   `TrustedHostMiddleware` — Protects against HTTP Host Header attacks.
-    *   `CORSMiddleware` — Strict allowed origins configuration.
-*   **Non-root User**: Docker containers run as a non-privileged user for enhanced security.
-
----
-
-## 📦 Deployment (Production)
-
-For production environments, Docker is recommended:
-
-```bash
-# Build and start in background
-docker compose up -d --build
-
-# Run migrations inside the container
-docker compose exec api uv run alembic upgrade head
-```
-
-**Production Checklist:**
-- [ ] Strong `SECRET_KEY` is configured.
-- [ ] `DEBUG` is set to `false`.
-- [ ] `ALLOWED_HOSTS` and `CORS_ORIGINS` contain only trusted domains.
-- [ ] HTTPS is configured (e.g., via Nginx or Traefik).
-
----
-
-## 📜 License
+## License
 
 Distributed under the [MIT](LICENSE) License.
