@@ -12,6 +12,7 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import engine
 from app.core.logging import setup_logging
+from app.core.middleware import RequestLoggingMiddleware
 from app.identity.infrastructure.routes import router as identity_router
 from app.issue_tracking.infrastructure.routes import (
     comment_router,
@@ -40,6 +41,9 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
+
+# Request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
 
 # Security middleware - only in production
 if not settings.DEBUG and settings.ALLOWED_HOSTS and settings.ALLOWED_HOSTS != ["*"]:
