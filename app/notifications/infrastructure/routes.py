@@ -27,10 +27,10 @@ from app.notifications.infrastructure.schemas import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/notifications", tags=["notifications"])
+router = APIRouter(tags=["notifications"])
 
 
-@router.get("", response_model=NotificationListResponse)
+@router.get("", response_model=NotificationListResponse, status_code=status.HTTP_200_OK)
 async def list_notifications(
     notifications: list[NotificationModel] = Depends(resolve_notification_list),
 ) -> NotificationListResponse:
@@ -40,7 +40,11 @@ async def list_notifications(
     )
 
 
-@router.patch("/{notification_id}/read", response_model=NotificationResponse)
+@router.patch(
+    "/{notification_id}/read",
+    response_model=NotificationResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def mark_notification_read(
     notification_id: str,
     current_user: UserModel = Depends(get_current_user),
