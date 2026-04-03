@@ -39,10 +39,15 @@ from app.identity.infrastructure.schemas import (
 )
 from app.shared.domain.identifiers import UserId
 
-router = APIRouter(responses=api_messages.UNAUTHORIZED_RESPONSES)
+router = APIRouter(tags=["auth"], responses=api_messages.UNAUTHORIZED_RESPONSES)
 
 
-@router.get("/me", response_model=UserResponse, description="Get current user")
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    description="Get current user",
+)
 async def read_current_user(
     current_user: UserModel = Depends(get_current_user),
 ) -> UserModel:
@@ -80,6 +85,7 @@ async def reset_current_user_password(
 @router.post(
     "/access-token",
     response_model=AccessTokenResponse,
+    status_code=status.HTTP_200_OK,
     responses=api_messages.ACCESS_TOKEN_RESPONSES,
     description="OAuth2 compatible token, get an access token for future requests using username and password",
 )
@@ -109,6 +115,7 @@ async def login_access_token(
 @router.post(
     "/refresh-token",
     response_model=AccessTokenResponse,
+    status_code=status.HTTP_200_OK,
     responses=api_messages.REFRESH_TOKEN_RESPONSES,
     description="OAuth2 compatible token, get an access token for future requests using refresh token",
 )

@@ -1,5 +1,7 @@
 """Comment API routes."""
 
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.identity.infrastructure.deps import get_current_user
@@ -26,10 +28,14 @@ from app.issue_tracking.infrastructure.schemas import (
     CommentResponse,
 )
 
-router = APIRouter(prefix="/issues/{issue_id}/comments", tags=["comments"])
+router = APIRouter(tags=["comments"])
 
 
-@router.get("", response_model=CommentListResponse)
+@router.get(
+    "",
+    response_model=CommentListResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def list_comments(
     comments: list[CommentModel] = Depends(resolve_comment_list),
 ) -> CommentListResponse:
@@ -37,7 +43,11 @@ async def list_comments(
     return CommentListResponse(comments=list(comments), total=len(comments))
 
 
-@router.post("", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_comment(
     issue_id: str,
     comment_data: CommentCreate,
@@ -71,7 +81,10 @@ async def create_comment(
     )
 
 
-@router.delete("/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{comment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_comment(
     issue_id: str,
     comment_id: str,
