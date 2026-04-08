@@ -69,6 +69,7 @@ async def mark_notification_read(
         notification_id=notification.notification_id.value,
         issue_id=notification.issue_id,
         message=notification.message,
+        payload=notification.payload,
         is_read=notification.is_read,
         created_at=notification.created_at,
     )

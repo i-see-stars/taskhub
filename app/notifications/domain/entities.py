@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.shared.domain.base import Entity
@@ -18,4 +18,5 @@ class Notification(Entity):
     issue_id: str
     message: str
     is_read: bool
+    payload: dict[str, object] = field(default_factory=dict)
     created_at: datetime | None = None
