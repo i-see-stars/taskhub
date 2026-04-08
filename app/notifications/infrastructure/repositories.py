@@ -37,6 +37,7 @@ class PostgresNotificationRepository(NotificationRepository):
             user_id=UserId(model.user_id),
             issue_id=model.issue_id,
             message=model.message,
+            payload=model.payload,
             is_read=model.is_read,
             created_at=model.created_at,
         )
@@ -73,6 +74,7 @@ class PostgresNotificationRepository(NotificationRepository):
                 user_id=notification.user_id.value,
                 issue_id=notification.issue_id,
                 message=notification.message,
+                payload=notification.payload,
                 is_read=notification.is_read,
             )
             self._session.add(model)

@@ -72,6 +72,7 @@ def get_mark_notification_read_use_case(
 
 async def resolve_notification_list(
     is_read: bool | None = Query(None),
+    category: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
     current_user: UserModel = Depends(get_current_user),
 ) -> list[NotificationModel]:
@@ -79,10 +80,16 @@ async def resolve_notification_list(
 
     Args:
         is_read: Optional filter by read status.
+        category: Optional JSONB payload category filter.
         session: Database session.
         current_user: The authenticated user.
 
     Returns:
         List of notification models.
     """
-    return await list_notifications_for_user(session, current_user.user_id, is_read)
+    return await list_notifications_for_user(
+        session,
+        current_user.user_id,
+        is_read=is_read,
+        category=category,
+    )

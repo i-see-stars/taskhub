@@ -58,6 +58,11 @@ class InAppSender(NotificationSender):
             user_id=context.recipient_id,
             issue_id=context.issue_id,
             message=context.message,
+            payload={
+                "category": "issue_assignment",
+                "channel": "in_app",
+                "issue_id": context.issue_id,
+            },
         )
         self.session.add(notification)
         await self.session.flush()
@@ -74,6 +79,7 @@ class InAppSender(NotificationSender):
                 "notification_id": notification.notification_id,
                 "issue_id": context.issue_id,
                 "message": context.message,
+                "payload": notification.payload,
                 "created_at": created_at,
             },
         )

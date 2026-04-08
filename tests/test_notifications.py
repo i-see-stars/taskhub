@@ -23,6 +23,7 @@ async def test_notification(
         user_id=test_user.user_id,
         issue_id=test_issue.issue_id,
         message="You were assigned to: Test Issue",
+        payload={"category": "issue_assignment", "channel": "test"},
     )
     db_session.add(notification)
     await db_session.commit()
@@ -61,6 +62,26 @@ async def test_list_notifications_filter_unread(
 
 
 @pytest.mark.asyncio
+async def test_list_notifications_filter_by_category(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    test_notification: NotificationModel,
+) -> None:
+    """Test listing notifications filtered by JSONB payload category."""
+    response = await client.get(
+        "/notifications?category=issue_assignment",
+        headers=auth_headers,
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = NotificationListResponse.model_validate(response.json())
+    assert any(
+        n.notification_id == test_notification.notification_id
+        for n in data.notifications
+    )
+    assert all(n.payload["category"] == "issue_assignment" for n in data.notifications)
+
+
+@pytest.mark.asyncio
 async def test_list_notifications_unauthorized(client: AsyncClient) -> None:
     """Test listing notifications without auth returns 401."""
     response = await client.get("/notifications")
@@ -81,6 +102,7 @@ async def test_mark_notification_read(
     assert response.status_code == status.HTTP_200_OK
     data = NotificationResponse.model_validate(response.json())
     assert data.is_read is True
+    assert data.payload["category"] == "issue_assignment"
 
 
 @pytest.mark.asyncio
@@ -141,7 +163,11 @@ async def test_assign_issue_creates_notification(
     assert notif_response.status_code == status.HTTP_200_OK
     data = NotificationListResponse.model_validate(notif_response.json())
     assert data.total >= 1
-    assert any(n.issue_id == test_issue.issue_id for n in data.notifications)
+    assert any(
+        n.issue_id == test_issue.issue_id
+        and n.payload["category"] == "issue_assignment"
+        for n in data.notifications
+    )
 
 
 @pytest.mark.asyncio

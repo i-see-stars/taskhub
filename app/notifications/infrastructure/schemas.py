@@ -11,6 +11,7 @@ class NotificationResponse(BaseModel):
     notification_id: str
     issue_id: str
     message: str
+    payload: dict[str, object]
     is_read: bool
     created_at: datetime
 
